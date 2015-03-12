@@ -233,13 +233,10 @@ openshift ex router --create --credentials="${KUBECONFIG}" --images="${USE_IMAGE
 
 # install the registry. The --mount-host option is provided to reuse local storage.
 echo "[INFO] Installing the registry"
-# TODO: add --images="${USE_IMAGES}" when the Docker registry is built alongside OpenShift
-openshift ex registry --create --credentials="${KUBECONFIG}" --mount-host="/tmp/openshift.local.registry" --images='openshift/origin-${component}:latest'
+openshift ex registry --create --credentials="${KUBECONFIG}" --mount-host="/tmp/openshift.local.registry" --images="${USE_IMAGES}"
 
 echo "[INFO] Pre-pulling and pushing centos7"
 docker pull centos:centos7
-# TODO: remove after this becomes part of the build
-docker pull openshift/origin-docker-registry
 echo "[INFO] Pulled centos7"
 
 echo "[INFO] Waiting for Docker registry pod to start"
@@ -250,13 +247,9 @@ wait_for_command '[[ "$(osc get endpoints docker-registry -t "{{ if .endpoints }
 DOCKER_REGISTRY=$(osc get --output-version=v1beta1 --template="{{ .portalIP }}:{{ .port }}" service docker-registry)
 
 echo "[INFO] Verifying the docker-registry is up at ${DOCKER_REGISTRY}"
-wait_for_url_timed "http://${DOCKER_REGISTRY}" "[INFO] Docker registry says: " $((2*TIME_MIN))
+wait_for_url_timed "http://${DOCKER_REGISTRY}/v2/" "[INFO] Docker registry says: " $((2*TIME_MIN))
 
 [ "$(dig @${API_HOST} "docker-registry.default.local." A)" ]
-
-docker tag -f centos:centos7 ${DOCKER_REGISTRY}/cached/centos:centos7
-docker push ${DOCKER_REGISTRY}/cached/centos:centos7
-echo "[INFO] Pushed centos7"
 
 # Process template and create
 echo "[INFO] Submitting application template json for processing..."
@@ -300,7 +293,7 @@ osc exec -p ${registry_pod} whoami | grep root
 
 # Port forwarding
 osc port-forward -p ${registry_pod} 5001:5000 &
-wait_for_url_timed "http://localhost:5001/" "[INFO] Docker registry says: " $((10*TIME_SEC))
+wait_for_url_timed "http://localhost:5001/v2/" "[INFO] Docker registry says: " $((10*TIME_SEC))
 
 # UI e2e tests can be found in assets/test/e2e
 if [[ "$TEST_ASSETS" == "true" ]]; then

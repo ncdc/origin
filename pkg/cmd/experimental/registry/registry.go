@@ -197,7 +197,8 @@ func NewCmdRegistry(f *clientcmd.Factory, parentName, name string, out io.Writer
 										MountPath: cfg.Volume,
 									},
 								},
-								Privileged: mountHost,
+								Privileged:      mountHost,
+								ImagePullPolicy: kapi.PullIfNotPresent,
 							},
 						},
 						Volumes: []kapi.Volume{
