@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"strings"
 	"time"
 
 	"code.google.com/p/go-uuid/uuid"
@@ -50,6 +51,20 @@ func (ls *layerStore) Fetch(dgst digest.Digest) (distribution.Layer, error) {
 		fileReader: *fr,
 		digest:     dgst,
 	}, nil
+}
+
+func (ls *layerStore) Delete(dgst digest.Digest) error {
+	lp, err := ls.linkPath(dgst)
+	if err != nil {
+		return err
+	}
+
+	if strings.HasSuffix(lp, "/link") {
+		// strip off /link at the end
+		lp = lp[:len(lp)-5]
+	}
+
+	return ls.repository.driver.Delete(lp)
 }
 
 // Upload begins a layer upload, returning a handle. If the layer upload
@@ -150,9 +165,13 @@ func (ls *layerStore) newLayerUpload(uuid, path string, startedAt time.Time) (di
 	return lw, nil
 }
 
+func (ls *layerStore) linkPath(dgst digest.Digest) (string, error) {
+	return ls.repository.registry.pm.path(layerLinkPathSpec{name: ls.repository.Name(), digest: dgst})
+}
+
 func (ls *layerStore) path(dgst digest.Digest) (string, error) {
 	// We must traverse this path through the link to enforce ownership.
-	layerLinkPath, err := ls.repository.registry.pm.path(layerLinkPathSpec{name: ls.repository.Name(), digest: dgst})
+	layerLinkPath, err := ls.linkPath(dgst)
 	if err != nil {
 		return "", err
 	}

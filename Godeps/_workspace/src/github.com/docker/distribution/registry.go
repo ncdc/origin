@@ -26,6 +26,11 @@ func (f fullScope) Contains(string) bool {
 // all other scopes.
 var GlobalScope = Scope(fullScope{})
 
+type AdminService interface {
+	DeleteLayer(layer string, repositories []string) []error
+	DeleteManifest(revision digest.Digest, repositories []string) []error
+}
+
 // Namespace represents a collection of repositories, addressable by name.
 // Generally, a namespace is backed by a set of one or more services,
 // providing facilities such as registry access, trust, and indexing.
@@ -39,6 +44,8 @@ type Namespace interface {
 	// registry may or may not have the repository but should always return a
 	// reference.
 	Repository(ctx context.Context, name string) (Repository, error)
+
+	AdminService() AdminService
 }
 
 // Repository is a named collection of manifests and layers.
@@ -107,6 +114,9 @@ type LayerService interface {
 
 	// Fetch the layer identifed by TarSum.
 	Fetch(digest digest.Digest) (Layer, error)
+
+	// Delete unlinks the layer from a Repository.
+	Delete(dgst digest.Digest) error
 
 	// Upload begins a layer upload to repository identified by name,
 	// returning a handle.

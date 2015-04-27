@@ -1,7 +1,11 @@
 package storage
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/docker/distribution"
+	"github.com/docker/distribution/digest"
 	"github.com/docker/distribution/registry/api/v2"
 	"github.com/docker/distribution/registry/storage/cache"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
@@ -121,3 +125,71 @@ func (repo *repository) Signatures() distribution.SignatureService {
 		repository: repo,
 	}
 }
+
+func (reg *registry) AdminService() distribution.AdminService {
+	return &adminService{
+		registry: reg,
+	}
+}
+
+type adminService struct {
+	*registry
+}
+
+func (s *adminService) DeleteLayer(layer string, repositories []string) []error {
+	result := []error{}
+
+	dgst, err := digest.ParseDigest(layer)
+	if err != nil {
+		result = append(result, fmt.Errorf("Unable to parse layer %q as a digest: %v", layer, err))
+		return result
+	}
+
+	blobPath, err := s.blobStore.path(dgst)
+	if err != nil {
+		result = append(result, fmt.Errorf("Unable to get storage path for layer %q: %v", layer, err))
+		return result
+	}
+
+	if strings.HasSuffix(blobPath, "/data") {
+		// strip off /data
+		blobPath = blobPath[:len(blobPath)-5]
+	}
+
+	if err := s.driver.Delete(blobPath); err != nil {
+		result = append(result, fmt.Errorf("Error deleting layer %q: %v", layer, err))
+		return result
+	}
+
+	for _, repoName := range repositories {
+		repo, err := s.registry.Repository(context.Background(), repoName)
+		if err != nil {
+			result = append(result, fmt.Errorf("Error getting repository %q: %v", repoName, err))
+			continue
+		}
+
+		if err := repo.Layers().Delete(dgst); err != nil {
+			result = append(result, fmt.Errorf("Error unlinking layer %q from repository %q: %v", dgst, repoName, err))
+		}
+	}
+
+	return result
+}
+
+func (s *adminService) DeleteManifest(dgst digest.Digest, repoNames []string) []error {
+	errs := []error{}
+
+	for _, name := range repoNames {
+		repo, err := s.Repository(context.Background(), name)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("Unable to prepare repository %q for deletion of manifest %q", name, dgst.String()))
+		}
+
+		rs := &revisionStore{repository: repo.(*repository)}
+		errs = append(errs, rs.delete(dgst))
+	}
+
+	return errs
+}
+
+var _ distribution.AdminService = &adminService{}

@@ -470,6 +470,11 @@ func (app *App) nameRequired(r *http.Request) bool {
 	return route == nil || route.GetName() != v2.RouteNameBase
 }
 
+// Registry returns the app's registry.
+func (app *App) Registry() distribution.Namespace {
+	return app.registry
+}
+
 // apiBase implements a simple yes-man for doing overall checks against the
 // api. This can support auth roundtrips to support docker login.
 func apiBase(w http.ResponseWriter, r *http.Request) {
