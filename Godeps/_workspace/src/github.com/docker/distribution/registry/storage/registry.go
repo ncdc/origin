@@ -192,4 +192,13 @@ func (s *adminService) DeleteManifest(dgst digest.Digest, repoNames []string) []
 	return errs
 }
 
+func (s *adminService) DeleteRepository(name string) error {
+	repoPath, err := s.pm.path(repositoryPathSpec{name: name})
+	if err != nil {
+		return fmt.Errorf("Unable to create path spec for repository %q", name)
+	}
+
+	return s.driver.Delete(repoPath)
+}
+
 var _ distribution.AdminService = &adminService{}

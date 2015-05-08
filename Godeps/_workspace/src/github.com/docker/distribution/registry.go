@@ -27,8 +27,10 @@ func (f fullScope) Contains(string) bool {
 var GlobalScope = Scope(fullScope{})
 
 type AdminService interface {
+	// TODO add Prune(manifests ManifestPruningInfo, layers LayerPruningInfo) PruneResult
 	DeleteLayer(layer string, repositories []string) []error
 	DeleteManifest(revision digest.Digest, repositories []string) []error
+	DeleteRepository(name string) error
 }
 
 // Namespace represents a collection of repositories, addressable by name.

@@ -126,7 +126,8 @@ func (pm *pathMapper) path(spec pathSpec) (string, error) {
 	repoPrefix := append(rootPrefix, "repositories")
 
 	switch v := spec.(type) {
-
+	case repositoryPathSpec:
+		return path.Join(append(repoPrefix, v.name)...), nil
 	case manifestRevisionPathSpec:
 		components, err := digestPathComponents(v.revision, false)
 		if err != nil {
@@ -271,6 +272,12 @@ func (pm *pathMapper) path(spec pathSpec) (string, error) {
 type pathSpec interface {
 	pathSpec()
 }
+
+type repositoryPathSpec struct {
+	name string
+}
+
+func (repositoryPathSpec) pathSpec() {}
 
 // manifestRevisionPathSpec describes the components of the directory path for
 // a manifest revision.
