@@ -45,6 +45,7 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	"github.com/golang/groupcache/lru"
+	"github.com/openshift/dockerexec/pkg/libdocker"
 )
 
 const (
@@ -973,11 +974,6 @@ func (d *dockerExitError) ExitStatus() int {
 //  - should we support nsenter in a container, running with elevated privs and --pid=host?
 //  - use strong type for containerId
 func (dm *DockerManager) ExecInContainer(containerId string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
-	nsenter, err := exec.LookPath("nsenter")
-	if err != nil {
-		return fmt.Errorf("exec unavailable - unable to locate nsenter")
-	}
-
 	container, err := dm.client.InspectContainer(containerId)
 	if err != nil {
 		return err
@@ -987,56 +983,71 @@ func (dm *DockerManager) ExecInContainer(containerId string, cmd []string, stdin
 		return fmt.Errorf("container not running (%s)", container)
 	}
 
-	containerPid := container.State.Pid
-
-	// TODO what if the container doesn't have `env`???
-	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-m", "-i", "-u", "-n", "-p", "--", "env", "-i"}
-	args = append(args, fmt.Sprintf("HOSTNAME=%s", container.Config.Hostname))
-	args = append(args, container.Config.Env...)
-	args = append(args, cmd...)
-	command := exec.Command(nsenter, args...)
-	if tty {
-		p, err := kubecontainer.StartPty(command)
-		if err != nil {
-			return err
-		}
-		defer p.Close()
-
-		// make sure to close the stdout stream
-		defer stdout.Close()
-
-		if stdin != nil {
-			go io.Copy(p, stdin)
-		}
-
-		if stdout != nil {
-			go io.Copy(stdout, p)
-		}
-
-		return command.Wait()
-	} else {
-		if stdin != nil {
-			// Use an os.Pipe here as it returns true *os.File objects.
-			// This way, if you run 'kubectl exec -p <pod> -i bash' (no tty) and type 'exit',
-			// the call below to command.Run() can unblock because its Stdin is the read half
-			// of the pipe.
-			r, w, err := os.Pipe()
-			if err != nil {
-				return err
-			}
-			go io.Copy(w, stdin)
-
-			command.Stdin = r
-		}
-		if stdout != nil {
-			command.Stdout = stdout
-		}
-		if stderr != nil {
-			command.Stderr = stderr
-		}
-
-		return command.Run()
+	execOptions := libdocker.DockerExecOptions{
+		Args: cmd,
+		Env:  []string{},
+		//User:   context.String("user"),
+		//Cwd:    context.String("cwd"),
+		Stdin:  stdin,
+		Stdout: stdout,
+		Stderr: stderr,
+		Tty:    tty,
 	}
+
+	_, err = libdocker.RunInContainer(containerId, &execOptions)
+	return err
+
+	/*
+		containerPid := container.State.Pid
+			// TODO what if the container doesn't have `env`???
+			args := []string{"-t", fmt.Sprintf("%d", containerPid), "-m", "-i", "-u", "-n", "-p", "--", "env", "-i"}
+			args = append(args, fmt.Sprintf("HOSTNAME=%s", container.Config.Hostname))
+			args = append(args, container.Config.Env...)
+			args = append(args, cmd...)
+			command := exec.Command(nsenter, args...)
+			if tty {
+				p, err := kubecontainer.StartPty(command)
+				if err != nil {
+					return err
+				}
+				defer p.Close()
+
+				// make sure to close the stdout stream
+				defer stdout.Close()
+
+				if stdin != nil {
+					go io.Copy(p, stdin)
+				}
+
+				if stdout != nil {
+					go io.Copy(stdout, p)
+				}
+
+				return command.Wait()
+			} else {
+				if stdin != nil {
+					// Use an os.Pipe here as it returns true *os.File objects.
+					// This way, if you run 'kubectl exec -p <pod> -i bash' (no tty) and type 'exit',
+					// the call below to command.Run() can unblock because its Stdin is the read half
+					// of the pipe.
+					r, w, err := os.Pipe()
+					if err != nil {
+						return err
+					}
+					go io.Copy(w, stdin)
+
+					command.Stdin = r
+				}
+				if stdout != nil {
+					command.Stdout = stdout
+				}
+				if stderr != nil {
+					command.Stderr = stderr
+				}
+
+				return command.Run()
+			}
+	*/
 }
 
 // PortForward executes socat in the pod's network namespace and copies

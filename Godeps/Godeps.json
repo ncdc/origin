@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/openshift/origin",
-	"GoVersion": "go1.3.3",
+	"GoVersion": "go1.4.2",
 	"Packages": [
 		"./..."
 	],
@@ -980,6 +980,10 @@
 		{
 			"ImportPath": "github.com/mitchellh/mapstructure",
 			"Rev": "740c764bc6149d3f1806231418adb9f52c11bcbf"
+		},
+		{
+			"ImportPath": "github.com/openshift/dockerexec/pkg/libdocker",
+			"Rev": "2b2a06bdd70b41d27ee64e2d1dca64c85876de13"
 		},
 		{
 			"ImportPath": "github.com/openshift/openshift-sdn/ovssubnet",
