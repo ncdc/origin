@@ -22,12 +22,14 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"os/exec"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -1075,6 +1077,95 @@ func (dm *DockerManager) nativeExec(containerId string, cmd []string, stdin io.R
 	return err
 }
 
+func (dm *DockerManager) mrunalExec(containerId string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+	dockerexec, err := exec.LookPath("dockerexec")
+	if err != nil {
+		return fmt.Errorf("exec unavailable - unable to locate dockerexec")
+	}
+
+	container, err := dm.client.InspectContainer(containerId)
+	if err != nil {
+		return err
+	}
+
+	if !container.State.Running {
+		return fmt.Errorf("container not running (%s)", container)
+	}
+
+	args := []string{"exec", "--id", containerId}
+	if tty {
+		args = append(args, "-t")
+	}
+	args = append(args, "--env", fmt.Sprintf("HOSTNAME=%s", container.Config.Hostname))
+	args = append(args, cmd...)
+	command := exec.Command(dockerexec, args...)
+
+	addr, err := net.ResolveUnixAddr("unix", "/var/run/docker.sock")
+	if err != nil {
+		return err
+	}
+
+	conn, err := net.DialUnix("unix", nil, addr)
+	if err != nil {
+		return err
+	}
+
+	file, err := conn.File()
+	if err != nil {
+		return err
+	}
+
+	ucred, err := syscall.GetsockoptUcred(int(file.Fd()), syscall.SOL_SOCKET, syscall.SO_PEERCRED)
+	if err != nil {
+		return err
+	}
+
+	command.Env = []string{fmt.Sprintf("_DOCKER_PID=%d", ucred.Pid)}
+
+	if tty {
+		p, err := kubecontainer.StartPty(command)
+		if err != nil {
+			return err
+		}
+		defer p.Close()
+
+		// make sure to close the stdout stream
+		defer stdout.Close()
+
+		if stdin != nil {
+			go io.Copy(p, stdin)
+		}
+
+		if stdout != nil {
+			go io.Copy(stdout, p)
+		}
+
+		return command.Wait()
+	} else {
+		if stdin != nil {
+			// Use an os.Pipe here as it returns true *os.File objects.
+			// This way, if you run 'kubectl exec -p <pod> -i bash' (no tty) and type 'exit',
+			// the call below to command.Run() can unblock because its Stdin is the read half
+			// of the pipe.
+			r, w, err := os.Pipe()
+			if err != nil {
+				return err
+			}
+			go io.Copy(w, stdin)
+
+			command.Stdin = r
+		}
+		if stdout != nil {
+			command.Stdout = stdout
+		}
+		if stderr != nil {
+			command.Stderr = stderr
+		}
+
+		return command.Run()
+	}
+}
+
 // ExecInContainer runs the command inside the container identified by containerID.
 //
 // TODO:
@@ -1086,14 +1177,18 @@ func (dm *DockerManager) ExecInContainer(containerId string, cmd []string, stdin
 	// TODO abstract this upwards, so the exec implementation can be chosen when
 	// creating the Kubelet
 
-	useNativeExec, err := dm.nativeExecSupportExists()
-	if err != nil {
-		return err
-	}
-	if useNativeExec {
-		return dm.nativeExec(containerId, cmd, stdin, stdout, stderr, tty)
-	}
-	return dm.nsEnterExec(containerId, cmd, stdin, stdout, stderr, tty)
+	return dm.mrunalExec(containerId, cmd, stdin, stdout, stderr, tty)
+
+	/*
+		useNativeExec, err := dm.nativeExecSupportExists()
+		if err != nil {
+			return err
+		}
+		if useNativeExec {
+			return dm.nativeExec(containerId, cmd, stdin, stdout, stderr, tty)
+		}
+		return dm.nsEnterExec(containerId, cmd, stdin, stdout, stderr, tty)
+	*/
 }
 
 // PortForward executes socat in the pod's network namespace and copies
