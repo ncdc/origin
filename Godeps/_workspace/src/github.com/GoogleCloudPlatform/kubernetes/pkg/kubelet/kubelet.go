@@ -142,7 +142,8 @@ func NewMainKubelet(
 	mounter mount.Interface,
 	dockerDaemonContainer string,
 	configureCBR0 bool,
-	maxPods int) (*Kubelet, error) {
+	maxPods int,
+	dockerExecHandler string) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -275,7 +276,8 @@ func NewMainKubelet(
 			klet.networkPlugin,
 			klet,
 			klet.httpClient,
-			newKubeletRuntimeHooks(recorder))
+			newKubeletRuntimeHooks(recorder),
+			dockerExecHandler)
 	case "rkt":
 		conf := &rkt.Config{InsecureSkipVerify: true}
 		rktRuntime, err := rkt.New(

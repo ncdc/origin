@@ -18,19 +18,16 @@ package dockertools
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"os"
 	"os/exec"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -45,7 +42,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/docker/docker/pkg/term"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	"github.com/golang/groupcache/lru"
@@ -110,6 +106,9 @@ type DockerManager struct {
 
 	// Hooks injected into the container runtime.
 	runtimeHooks kubecontainer.RuntimeHooks
+
+	// Handler used to execute commands in containers.
+	execHandler DockerExecHandler
 }
 
 func NewDockerManager(
@@ -125,7 +124,8 @@ func NewDockerManager(
 	networkPlugin network.NetworkPlugin,
 	generator kubecontainer.RunContainerOptionsGenerator,
 	httpClient kubeletTypes.HttpGetter,
-	runtimeHooks kubecontainer.RuntimeHooks) *DockerManager {
+	runtimeHooks kubecontainer.RuntimeHooks,
+	execHandlerName string) *DockerManager {
 	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
 	// if there are any problems.
 	dockerRoot := "/var/lib/docker"
@@ -157,6 +157,15 @@ func NewDockerManager(
 	}
 
 	reasonCache := stringCache{cache: lru.New(maxReasonCacheEntries)}
+
+	RegisterExecHandler("docker-exec", &NativeDockerExec{client})
+	RegisterExecHandler("nsenter", &NsEnterExec{})
+
+	execHandler, err := GetExecHandler(execHandlerName)
+	if err != nil {
+		glog.Errorf("Error configuring exec handler %q; exec will not be available: %v", execHandlerName, err)
+	}
+
 	dm := &DockerManager{
 		client:              client,
 		recorder:            recorder,
@@ -172,6 +181,7 @@ func NewDockerManager(
 		prober:                 nil,
 		generator:              generator,
 		runtimeHooks:           runtimeHooks,
+		execHandler:            execHandler,
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
 	dm.prober = prober.New(dm, readinessManager, containerRefManager, recorder)
@@ -969,255 +979,25 @@ func (d *dockerExitError) ExitStatus() int {
 	return d.Inspect.ExitCode
 }
 
-func (dm *DockerManager) nsEnterExec(containerId string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
-	nsenter, err := exec.LookPath("nsenter")
-	if err != nil {
-		return fmt.Errorf("exec unavailable - unable to locate nsenter")
-	}
-
-	container, err := dm.client.InspectContainer(containerId)
-	if err != nil {
-		return err
-	}
-
-	if !container.State.Running {
-		return fmt.Errorf("container not running (%s)", container)
-	}
-
-	containerPid := container.State.Pid
-
-	// TODO what if the container doesn't have `env`???
-	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-m", "-i", "-u", "-n", "-p", "--", "env", "-i"}
-	args = append(args, fmt.Sprintf("HOSTNAME=%s", container.Config.Hostname))
-	args = append(args, container.Config.Env...)
-	args = append(args, cmd...)
-	command := exec.Command(nsenter, args...)
-	if tty {
-		p, err := kubecontainer.StartPty(command)
-		if err != nil {
-			return err
-		}
-		defer p.Close()
-
-		// make sure to close the stdout stream
-		defer stdout.Close()
-
-		if stdin != nil {
-			go io.Copy(p, stdin)
-		}
-
-		if stdout != nil {
-			go io.Copy(stdout, p)
-		}
-
-		return command.Wait()
-	} else {
-		if stdin != nil {
-			// Use an os.Pipe here as it returns true *os.File objects.
-			// This way, if you run 'kubectl exec -p <pod> -i bash' (no tty) and type 'exit',
-			// the call below to command.Run() can unblock because its Stdin is the read half
-			// of the pipe.
-			r, w, err := os.Pipe()
-			if err != nil {
-				return err
-			}
-			go io.Copy(w, stdin)
-
-			command.Stdin = r
-		}
-		if stdout != nil {
-			command.Stdout = stdout
-		}
-		if stderr != nil {
-			command.Stderr = stderr
-		}
-
-		return command.Run()
-	}
-}
-
-func (dm *DockerManager) nativeExec(containerId string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
-	createOpts := docker.CreateExecOptions{
-		Container:    containerId,
-		Cmd:          cmd,
-		AttachStdin:  stdin != nil,
-		AttachStdout: stdout != nil,
-		AttachStderr: stderr != nil,
-		Tty:          tty,
-	}
-	execObj, err := dm.client.CreateExec(createOpts)
-	if err != nil {
-		return fmt.Errorf("failed to exec in container - Exec setup failed - %v", err)
-	}
-	startOpts := docker.StartExecOptions{
-		Detach:       false,
-		InputStream:  stdin,
-		OutputStream: stdout,
-		ErrorStream:  stderr,
-		Tty:          tty,
-		RawTerminal:  tty,
-	}
-	err = dm.client.StartExec(execObj.ID, startOpts)
-	if err != nil {
-		return err
-	}
-	tick := time.Tick(2 * time.Second)
-	for {
-		inspect, err2 := dm.client.InspectExec(execObj.ID)
-		if err2 != nil {
-			return err2
-		}
-		if !inspect.Running {
-			if inspect.ExitCode != 0 {
-				err = &dockerExitError{inspect}
-			}
-			break
-		}
-		<-tick
-	}
-
-	return err
-}
-
-func (dm *DockerManager) mrunalExec(containerId string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, winch io.Reader) error {
-	dockerexec, err := exec.LookPath("dockerexec")
-	if err != nil {
-		return fmt.Errorf("exec unavailable - unable to locate dockerexec")
-	}
-
-	container, err := dm.client.InspectContainer(containerId)
-	if err != nil {
-		return err
-	}
-
-	if !container.State.Running {
-		return fmt.Errorf("container not running (%s)", container)
-	}
-
-	args := []string{"exec", "--id", containerId}
-	if tty {
-		args = append(args, "-t")
-	}
-	args = append(args, "--env", fmt.Sprintf("HOSTNAME=%s", container.Config.Hostname))
-	args = append(args, cmd...)
-	command := exec.Command(dockerexec, args...)
-
-	addr, err := net.ResolveUnixAddr("unix", "/var/run/docker.sock")
-	if err != nil {
-		return err
-	}
-
-	conn, err := net.DialUnix("unix", nil, addr)
-	if err != nil {
-		return err
-	}
-
-	file, err := conn.File()
-	if err != nil {
-		return err
-	}
-
-	ucred, err := syscall.GetsockoptUcred(int(file.Fd()), syscall.SOL_SOCKET, syscall.SO_PEERCRED)
-	if err != nil {
-		return err
-	}
-
-	command.Env = []string{fmt.Sprintf("_DOCKER_PID=%d", ucred.Pid)}
-
-	if tty {
-		p, err := kubecontainer.StartPty(command)
-		if err != nil {
-			return err
-		}
-		defer p.Close()
-
-		// make sure to close the stdout stream
-		defer stdout.Close()
-
-		if stdin != nil {
-			go io.Copy(p, stdin)
-		}
-
-		if stdout != nil {
-			go io.Copy(stdout, p)
-		}
-
-		if winch != nil {
-			go func() {
-				var w, h uint16
-				for {
-					fmt.Printf("Reading winch width\n")
-					err := binary.Read(winch, binary.LittleEndian, &w)
-					if err != nil {
-						glog.Errorf("Error reading width: %v", err)
-						return
-					}
-					fmt.Printf("Got winch width: %d\n", w)
-
-					err = binary.Read(winch, binary.LittleEndian, &h)
-					if err != nil {
-						glog.Errorf("Error reading height: %v", err)
-						return
-					}
-					fmt.Printf("Got winch height: %d\n", h)
-
-					err = term.SetWinsize(p.Fd(), &term.Winsize{Height: h, Width: w})
-					if err != nil {
-						glog.Errorf("Error setting winsize: %v", err)
-					}
-				}
-			}()
-		}
-
-		return command.Wait()
-	} else {
-		if stdin != nil {
-			// Use an os.Pipe here as it returns true *os.File objects.
-			// This way, if you run 'kubectl exec -p <pod> -i bash' (no tty) and type 'exit',
-			// the call below to command.Run() can unblock because its Stdin is the read half
-			// of the pipe.
-			r, w, err := os.Pipe()
-			if err != nil {
-				return err
-			}
-			go io.Copy(w, stdin)
-
-			command.Stdin = r
-		}
-		if stdout != nil {
-			command.Stdout = stdout
-		}
-		if stderr != nil {
-			command.Stderr = stderr
-		}
-
-		return command.Run()
-	}
-}
-
 // ExecInContainer runs the command inside the container identified by containerID.
 //
 // TODO:
-//  - match cgroups of container
-//  - should we support `docker exec`?
-//  - should we support nsenter in a container, running with elevated privs and --pid=host?
 //  - use strong type for containerId
 func (dm *DockerManager) ExecInContainer(containerId string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, winch io.Reader) error {
-	// TODO abstract this upwards, so the exec implementation can be chosen when
-	// creating the Kubelet
+	if dm.execHandler == nil {
+		return errors.New("unable to exec without an exec handler")
+	}
 
-	return dm.mrunalExec(containerId, cmd, stdin, stdout, stderr, tty, winch)
+	container, err := dm.client.InspectContainer(containerId)
+	if err != nil {
+		return err
+	}
 
-	/*
-		useNativeExec, err := dm.nativeExecSupportExists()
-		if err != nil {
-			return err
-		}
-		if useNativeExec {
-			return dm.nativeExec(containerId, cmd, stdin, stdout, stderr, tty)
-		}
-		return dm.nsEnterExec(containerId, cmd, stdin, stdout, stderr, tty)
-	*/
+	if !container.State.Running {
+		return fmt.Errorf("container not running (%s)", container)
+	}
+
+	return dm.execHandler.ExecInContainer(container, cmd, stdin, stdout, stderr, tty, winch)
 }
 
 // PortForward executes socat in the pod's network namespace and copies
