@@ -62,13 +62,13 @@ func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *
 }
 
 type remoteExecutor interface {
-	Execute(req *client.Request, config *client.Config, command []string, stdin io.Reader, stdout, stderr io.Writer, tty bool) error
+	Execute(req *client.Request, config *client.Config, command []string, stdin io.Reader, stdout, stderr io.Writer, tty bool, resizeChan chan *term.Winsize) error
 }
 
 type defaultRemoteExecutor struct{}
 
-func (*defaultRemoteExecutor) Execute(req *client.Request, config *client.Config, command []string, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
-	executor := remotecommand.New(req, config, command, stdin, stdout, stderr, tty)
+func (*defaultRemoteExecutor) Execute(req *client.Request, config *client.Config, command []string, stdin io.Reader, stdout, stderr io.Writer, tty bool, resizeChan chan *term.Winsize) error {
+	executor := remotecommand.New(req, config, command, stdin, stdout, stderr, tty, resizeChan)
 	return executor.Execute()
 }
 
@@ -112,6 +112,7 @@ func RunExec(f *cmdutil.Factory, cmd *cobra.Command, cmdIn io.Reader, cmdOut, cm
 	}
 
 	var stdin io.Reader
+	var resizeChan chan *term.Winsize
 	tty := p.tty
 	if p.stdin {
 		stdin = cmdIn
@@ -137,6 +138,22 @@ func RunExec(f *cmdutil.Factory, cmd *cobra.Command, cmdIn io.Reader, cmdOut, cm
 						term.RestoreTerminal(inFd, oldState)
 						os.Exit(0)
 					}()
+
+					// this handles SIGWINCH (window resize)
+					resizeChan = make(chan *term.Winsize, 1)
+					if err := resizeTerminal(inFd, resizeChan); err != nil {
+						glog.Errorf("Error resizing terminal: %v", err)
+					}
+
+					winchChan := make(chan os.Signal, 1)
+					signal.Notify(winchChan, syscall.SIGWINCH)
+					go func() {
+						for _ = range winchChan {
+							if err := resizeTerminal(inFd, resizeChan); err != nil {
+								glog.Errorf("Error resizing terminal: %v", err)
+							}
+						}
+					}()
 				} else {
 					glog.Warning("Stdin is not a terminal")
 				}
@@ -159,5 +176,14 @@ func RunExec(f *cmdutil.Factory, cmd *cobra.Command, cmdIn io.Reader, cmdOut, cm
 		SubResource("exec").
 		Param("container", containerName)
 
-	return re.Execute(req, config, args, stdin, cmdOut, cmdErr, tty)
+	return re.Execute(req, config, args, stdin, cmdOut, cmdErr, tty, resizeChan)
+}
+
+func resizeTerminal(fd uintptr, resizeChan chan *term.Winsize) error {
+	winSize, err := term.GetWinsize(fd)
+	if err != nil {
+		return err
+	}
+	resizeChan <- winSize
+	return nil
 }

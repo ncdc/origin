@@ -104,7 +104,7 @@ type HostInterface interface {
 	GetPods() []*api.Pod
 	GetPodByName(namespace, name string) (*api.Pod, bool)
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
-	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
+	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, winch io.Reader) error
 	GetKubeletContainerLogs(podFullName, containerName, tail string, follow, previous bool, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 	PortForward(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error
@@ -372,22 +372,30 @@ func (s *Server) handleExec(w http.ResponseWriter, req *http.Request) {
 	}
 
 	req.ParseForm()
-	// start at 1 for error stream
-	expectedStreams := 1
-	if req.FormValue(api.ExecStdinParam) == "1" {
-		expectedStreams++
-	}
-	if req.FormValue(api.ExecStdoutParam) == "1" {
-		expectedStreams++
-	}
-	tty := req.FormValue(api.ExecTTYParam) == "1"
-	if !tty && req.FormValue(api.ExecStderrParam) == "1" {
-		expectedStreams++
-	}
 
-	if expectedStreams == 1 {
+	expectStdin := req.FormValue(api.ExecStdinParam) == "1"
+	expectStdout := req.FormValue(api.ExecStdoutParam) == "1"
+	tty := req.FormValue(api.ExecTTYParam) == "1"
+	expectStderr := !tty && req.FormValue(api.ExecStderrParam) == "1"
+
+	if !expectStdin && !expectStdout && !expectStderr {
 		http.Error(w, "You must specify at least 1 of stdin, stdout, stderr", http.StatusBadRequest)
 		return
+	}
+
+	// start at 1 for error stream
+	expectedStreams := 1
+	if expectStdin {
+		expectedStreams++
+	}
+	if expectStdout {
+		expectedStreams++
+	}
+	if expectStderr {
+		expectedStreams++
+	}
+	if tty {
+		expectedStreams++
 	}
 
 	streamCh := make(chan httpstream.Stream)
@@ -411,7 +419,7 @@ func (s *Server) handleExec(w http.ResponseWriter, req *http.Request) {
 	// TODO make it configurable?
 	expired := time.NewTimer(streamCreationTimeout)
 
-	var errorStream, stdinStream, stdoutStream, stderrStream httpstream.Stream
+	var errorStream, winchStream, stdinStream, stdoutStream, stderrStream httpstream.Stream
 	receivedStreams := 0
 WaitForStreams:
 	for {
@@ -432,6 +440,9 @@ WaitForStreams:
 			case api.StreamTypeStderr:
 				stderrStream = stream
 				receivedStreams++
+			case api.StreamTypeWinch:
+				winchStream = stream
+				receivedStreams++
 			default:
 				glog.Errorf("Unexpected stream type: '%s'", streamType)
 			}
@@ -451,7 +462,7 @@ WaitForStreams:
 		stdinStream.Close()
 	}
 
-	err = s.host.ExecInContainer(kubecontainer.GetPodFullName(pod), uid, container, u.Query()[api.ExecCommandParamm], stdinStream, stdoutStream, stderrStream, tty)
+	err = s.host.ExecInContainer(kubecontainer.GetPodFullName(pod), uid, container, u.Query()[api.ExecCommandParamm], stdinStream, stdoutStream, stderrStream, tty, winchStream)
 	if err != nil {
 		msg := fmt.Sprintf("Error executing command in container: %v", err)
 		glog.Error(msg)

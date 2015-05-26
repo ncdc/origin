@@ -2048,7 +2048,7 @@ func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containe
 
 // ExecInContainer executes a command in a container, connecting the supplied
 // stdin/stdout/stderr to the command's IO streams.
-func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, containerName string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, containerName string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, winch io.Reader) error {
 	podUID = kl.podManager.TranslatePodUID(podUID)
 
 	container, err := kl.findContainer(podFullName, podUID, containerName)
@@ -2058,7 +2058,7 @@ func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, contain
 	if container == nil {
 		return fmt.Errorf("container not found (%q)", containerName)
 	}
-	return kl.runner.ExecInContainer(string(container.ID), cmd, stdin, stdout, stderr, tty)
+	return kl.runner.ExecInContainer(string(container.ID), cmd, stdin, stdout, stderr, tty, winch)
 }
 
 // PortForward connects to the pod's port and copies data between the port

@@ -957,7 +957,7 @@ func (r *runtime) RunInContainer(containerID string, cmd []string) ([]byte, erro
 
 // Note: In rkt, the container ID is in the form of "UUID:appName:ImageID", where
 // appName is the container name.
-func (r *runtime) ExecInContainer(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+func (r *runtime) ExecInContainer(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, winch io.Reader) error {
 	glog.V(4).Infof("Rkt execing in container.")
 
 	id, err := parseContainerID(containerID)

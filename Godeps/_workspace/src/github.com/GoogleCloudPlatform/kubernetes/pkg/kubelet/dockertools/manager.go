@@ -18,6 +18,7 @@ package dockertools
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -44,6 +45,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/docker/docker/pkg/term"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	"github.com/golang/groupcache/lru"
@@ -1077,7 +1079,7 @@ func (dm *DockerManager) nativeExec(containerId string, cmd []string, stdin io.R
 	return err
 }
 
-func (dm *DockerManager) mrunalExec(containerId string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+func (dm *DockerManager) mrunalExec(containerId string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, winch io.Reader) error {
 	dockerexec, err := exec.LookPath("dockerexec")
 	if err != nil {
 		return fmt.Errorf("exec unavailable - unable to locate dockerexec")
@@ -1140,6 +1142,33 @@ func (dm *DockerManager) mrunalExec(containerId string, cmd []string, stdin io.R
 			go io.Copy(stdout, p)
 		}
 
+		if winch != nil {
+			go func() {
+				var w, h uint16
+				for {
+					fmt.Printf("Reading winch width\n")
+					err := binary.Read(winch, binary.LittleEndian, &w)
+					if err != nil {
+						glog.Errorf("Error reading width: %v", err)
+						return
+					}
+					fmt.Printf("Got winch width: %d\n", w)
+
+					err = binary.Read(winch, binary.LittleEndian, &h)
+					if err != nil {
+						glog.Errorf("Error reading height: %v", err)
+						return
+					}
+					fmt.Printf("Got winch height: %d\n", h)
+
+					err = term.SetWinsize(p.Fd(), &term.Winsize{Height: h, Width: w})
+					if err != nil {
+						glog.Errorf("Error setting winsize: %v", err)
+					}
+				}
+			}()
+		}
+
 		return command.Wait()
 	} else {
 		if stdin != nil {
@@ -1173,11 +1202,11 @@ func (dm *DockerManager) mrunalExec(containerId string, cmd []string, stdin io.R
 //  - should we support `docker exec`?
 //  - should we support nsenter in a container, running with elevated privs and --pid=host?
 //  - use strong type for containerId
-func (dm *DockerManager) ExecInContainer(containerId string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+func (dm *DockerManager) ExecInContainer(containerId string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, winch io.Reader) error {
 	// TODO abstract this upwards, so the exec implementation can be chosen when
 	// creating the Kubelet
 
-	return dm.mrunalExec(containerId, cmd, stdin, stdout, stderr, tty)
+	return dm.mrunalExec(containerId, cmd, stdin, stdout, stderr, tty, winch)
 
 	/*
 		useNativeExec, err := dm.nativeExecSupportExists()

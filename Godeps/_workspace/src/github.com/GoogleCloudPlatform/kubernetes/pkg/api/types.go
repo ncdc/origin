@@ -1918,6 +1918,7 @@ const (
 	StreamTypeStderr = "stderr"
 	StreamTypeData   = "data"
 	StreamTypeError  = "error"
+	StreamTypeWinch  = "winch"
 
 	PortHeader = "port"
 )

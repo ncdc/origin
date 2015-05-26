@@ -17,6 +17,7 @@ limitations under the License.
 package remotecommand
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -27,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion/queryparams"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream/spdy"
+	"github.com/docker/docker/pkg/term"
 	"github.com/golang/glog"
 )
 
@@ -42,27 +44,29 @@ func (u *defaultUpgrader) upgrade(req *client.Request, config *client.Config) (h
 
 // Executor executes a command on a pod container
 type Executor struct {
-	req     *client.Request
-	config  *client.Config
-	command []string
-	stdin   io.Reader
-	stdout  io.Writer
-	stderr  io.Writer
-	tty     bool
+	req        *client.Request
+	config     *client.Config
+	command    []string
+	stdin      io.Reader
+	stdout     io.Writer
+	stderr     io.Writer
+	tty        bool
+	resizeChan chan *term.Winsize
 
 	upgrader upgrader
 }
 
 // New creates a new RemoteCommandExecutor
-func New(req *client.Request, config *client.Config, command []string, stdin io.Reader, stdout, stderr io.Writer, tty bool) *Executor {
+func New(req *client.Request, config *client.Config, command []string, stdin io.Reader, stdout, stderr io.Writer, tty bool, resizeChan chan *term.Winsize) *Executor {
 	return &Executor{
-		req:     req,
-		config:  config,
-		command: command,
-		stdin:   stdin,
-		stdout:  stdout,
-		stderr:  stderr,
-		tty:     tty,
+		req:        req,
+		config:     config,
+		command:    command,
+		stdin:      stdin,
+		stdout:     stdout,
+		stderr:     stderr,
+		tty:        tty,
+		resizeChan: resizeChan,
 	}
 }
 
@@ -171,6 +175,29 @@ func (e *Executor) Execute() error {
 		}
 		defer remoteStderr.Reset()
 		go cp(api.StreamTypeStderr, e.stderr, remoteStderr)
+	}
+
+	if opts.TTY {
+		headers.Set(api.StreamType, api.StreamTypeWinch)
+		winchStream, err := conn.CreateStream(headers)
+		if err != nil {
+			return err
+		}
+		go func() {
+			for winSize := range e.resizeChan {
+				//fmt.Printf("remotecommand write width=%d\n", winSize.Width)
+				err := binary.Write(winchStream, binary.LittleEndian, winSize.Width)
+				if err != nil {
+					fmt.Printf("Error writing width: %v", err)
+				}
+
+				//fmt.Printf("remotecommand write height=%d\n", winSize.Height)
+				err = binary.Write(winchStream, binary.LittleEndian, winSize.Height)
+				if err != nil {
+					fmt.Printf("Error writing height: %v", err)
+				}
+			}
+		}()
 	}
 
 Loop:

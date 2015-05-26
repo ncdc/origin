@@ -87,7 +87,7 @@ type ContainerCommandRunner interface {
 	// Attaches the processes stdin, stdout, and stderr. Optionally uses a
 	// tty.
 	// TODO(yifan): Use strong type for containerID.
-	ExecInContainer(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error
+	ExecInContainer(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, winch io.Reader) error
 	// Forward the specified port from the specified pod to the stream.
 	PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error
 }
