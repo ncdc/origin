@@ -27,6 +27,7 @@ import (
 
 	cmdutil "github.com/openshift/origin/pkg/cmd/util"
 	dockerutil "github.com/openshift/origin/pkg/cmd/util/docker"
+	osexec "github.com/openshift/origin/pkg/exec"
 )
 
 type commandExecutor interface {
@@ -179,6 +180,19 @@ func (c *NodeConfig) RunKubelet() {
 		}
 	}
 
+	var dockerExecHandler dockertools.ExecHandler
+	switch c.DockerExecHandlerName {
+	case "openshift":
+		dockerExecHandler = &osexec.OpenShiftExecHandler{}
+	case "native":
+		dockerExecHandler = &dockertools.NativeExecHandler{}
+	case "nsenter":
+		dockerExecHandler = &dockertools.NsenterExecHandler{}
+	default:
+		glog.Warningf("Invalid Docker exec handler %q. Valid values are 'openshift', 'native', and 'nsenter'. Defaulting to 'openshift'.")
+		dockerExecHandler = &osexec.OpenShiftExecHandler{}
+	}
+
 	kcfg := kapp.KubeletConfig{
 		Address: util.IP(net.ParseIP(kubeAddress)),
 		// Allow privileged containers
@@ -226,6 +240,7 @@ func (c *NodeConfig) RunKubelet() {
 		DockerDaemonContainer:     "",
 		ConfigureCBR0:             false,
 		MaxPods:                   200,
+		DockerExecHandler:         dockerExecHandler,
 	}
 	kapp.RunKubelet(&kcfg, nil)
 }

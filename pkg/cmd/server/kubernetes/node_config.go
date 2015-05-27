@@ -62,6 +62,9 @@ type NodeConfig struct {
 	// PodManifestCheckIntervalSeconds is the interval in seconds for checking the manifest file(s) for new data
 	// The interval needs to be a positive value
 	PodManifestCheckIntervalSeconds int64
+
+	// The name of the DockerExecHandler to use for exec calls.
+	DockerExecHandlerName string
 }
 
 func BuildKubernetesNodeConfig(options configapi.NodeConfig) (*NodeConfig, error) {
