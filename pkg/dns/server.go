@@ -14,6 +14,7 @@ func NewServerDefaults() (*server.Config, error) {
 	config := &server.Config{
 		Domain: "cluster.local.",
 		Local:  "openshift.default.svc.cluster.local.",
+		NoRec:  true,
 	}
 	return config, server.SetDefaults(config)
 }
