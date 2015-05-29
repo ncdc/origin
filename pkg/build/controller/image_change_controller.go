@@ -63,44 +63,6 @@ func (c *ImageChangeController) HandleImageRepo(repo *imageapi.ImageStream) erro
 		// throughout the build strategies. A new build is triggered only if the latest tagged image id or pull spec
 		// differs from the last triggered build recorded on the build config.
 		for _, trigger := range config.Triggers {
-			if trigger.Type != buildapi.ImageChangeBuildTriggerType {
-				continue
-			}
-			fromStreamName := getImageStreamNameFromReference(from)
-
-			fromNamespace := from.Namespace
-			if len(fromNamespace) == 0 {
-				fromNamespace = config.Namespace
-			}
-
-			// only trigger a build if this image repo matches the name and namespace of the ref in the build trigger
-			// also do not trigger if the imagerepo does not have a valid DockerImageRepository value for us to pull
-			// the image from
-			if len(repo.Status.DockerImageRepository) == 0 || fromStreamName != repo.Name || fromNamespace != repo.Namespace {
-				continue
-			}
-
-			// This split is safe because ImageStreamTag names always have the form
-			// name:tag.
-			tag := strings.Split(from.Name, ":")[1]
-			latest := imageapi.LatestTaggedImage(repo, tag)
-			if latest == nil {
-				util.HandleError(fmt.Errorf("unable to find tagged image: no image recorded for %s/%s:%s", repo.Namespace, repo.Name, tag))
-				continue
-			}
-			glog.V(4).Infof("Found ImageStream %s/%s with tag %s", repo.Namespace, repo.Name, tag)
-
-			// (must be different) to trigger a build
-			last := trigger.ImageChange.LastTriggeredImageID
-			next := latest.DockerImageReference
-
-			if len(last) == 0 || (len(next) > 0 && next != last) {
-				triggeredImage = next
-				shouldBuild = true
-				// it doesn't really make sense to have multiple image change triggers any more,
-				// so just exit the loop now
-				break
-			}
 		}
 
 		if shouldBuild {
@@ -128,4 +90,45 @@ func (c *ImageChangeController) HandleImageRepo(repo *imageapi.ImageStream) erro
 		}
 	}
 	return nil
+}
+
+func (c *ImageChangeController) buildRequired(trigger buildapi.BuildTriggerPolicy, stream *imageapi.ImageStream) (bool, string) {
+	if trigger.Type != buildapi.ImageChangeBuildTriggerType {
+		return false, ""
+	}
+	fromStreamName := getImageStreamNameFromReference(from)
+
+	fromNamespace := from.Namespace
+	if len(fromNamespace) == 0 {
+		fromNamespace = config.Namespace
+	}
+
+	// only trigger a build if this image stream matches the name and namespace of the ref in the build trigger
+	// also do not trigger if the imagerepo does not have a valid DockerImageRepository value for us to pull
+	// the image from
+	if len(stream.Status.DockerImageRepository) == 0 || fromStreamName != stream.Name || fromNamespace != stream.Namespace {
+		return false, ""
+	}
+
+	// This split is safe because ImageStreamTag names always have the form
+	// name:tag.
+	tag := strings.Split(from.Name, ":")[1]
+	latest := imageapi.LatestTaggedImage(stream, tag)
+	if latest == nil {
+		util.HandleError(fmt.Errorf("unable to find tagged image: no image recorded for %s/%s:%s", stream.Namespace, stream.Name, tag))
+		return false, ""
+	}
+	glog.V(4).Infof("Found ImageStream %s/%s with tag %s", stream.Namespace, stream.Name, tag)
+
+	// (must be different) to trigger a build
+	last := trigger.ImageChange.LastTriggeredImageID
+	next := latest.DockerImageReference
+
+	if len(last) == 0 || (len(next) > 0 && next != last) {
+		triggeredImage = next
+		shouldBuild = true
+		// it doesn't really make sense to have multiple image change triggers any more,
+		// so just exit the loop now
+		break
+	}
 }
