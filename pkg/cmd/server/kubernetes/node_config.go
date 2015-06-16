@@ -20,6 +20,7 @@ import (
 	cmdutil "github.com/openshift/origin/pkg/cmd/util"
 	cmdflags "github.com/openshift/origin/pkg/cmd/util/flags"
 	"github.com/openshift/origin/pkg/cmd/util/variable"
+	"github.com/openshift/origin/pkg/exec"
 )
 
 // NodeConfig represents the required parameters to start the OpenShift node
@@ -79,6 +80,8 @@ func BuildKubernetesNodeConfig(options configapi.NodeConfig) (*NodeConfig, error
 	var dockerExecHandler dockertools.ExecHandler
 
 	switch options.DockerConfig.ExecHandlerName {
+	case configapi.DockerExecHandlerOpenShift:
+		dockerExecHandler = &exec.OpenShiftExecHandler{}
 	case configapi.DockerExecHandlerNative:
 		dockerExecHandler = &dockertools.NativeExecHandler{}
 	case configapi.DockerExecHandlerNsenter:

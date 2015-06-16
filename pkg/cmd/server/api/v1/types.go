@@ -65,7 +65,8 @@ const (
 	// DockerExecHandlerNative uses Docker's exec API for executing commands in containers.
 	DockerExecHandlerNative DockerExecHandlerType = "native"
 	// DockerExecHandlerNsenter uses nsenter for executing commands in containers.
-	DockerExecHandlerNsenter DockerExecHandlerType = "nsenter"
+	DockerExecHandlerNsenter   DockerExecHandlerType = "nsenter"
+	DockerExecHandlerOpenShift DockerExecHandlerType = "openshift"
 
 	// ControllersDisabled indicates no controllers should be enabled.
 	ControllersDisabled = "none"

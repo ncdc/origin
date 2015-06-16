@@ -38,7 +38,7 @@ func ValidateDockerConfig(config api.DockerConfig) fielderrors.ValidationErrorLi
 	allErrs := fielderrors.ValidationErrorList{}
 
 	switch config.ExecHandlerName {
-	case api.DockerExecHandlerNative, api.DockerExecHandlerNsenter:
+	case api.DockerExecHandlerNative, api.DockerExecHandlerNsenter, api.DockerExecHandlerOpenShift:
 		// ok
 	default:
 		validValues := strings.Join([]string{string(api.DockerExecHandlerNative), string(api.DockerExecHandlerNsenter)}, ", ")
