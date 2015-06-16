@@ -219,6 +219,8 @@ func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Reque
 	done := make(chan struct{}, 2)
 
 	go func() {
+		glog.Infof("ANDY Copying from client to backend")
+		defer glog.Infof("DONE Copying from client to backend")
 		_, err := io.Copy(backendConn, requestHijackedConn)
 		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
 			glog.Errorf("Error proxying data from client to backend: %v", err)
@@ -227,6 +229,8 @@ func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Reque
 	}()
 
 	go func() {
+		glog.Infof("ANDY Copying from backend to client")
+		defer glog.Infof("DONE Copying from backend to client")
 		_, err := io.Copy(requestHijackedConn, backendConn)
 		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
 			glog.Errorf("Error proxying data from backend to client: %v", err)

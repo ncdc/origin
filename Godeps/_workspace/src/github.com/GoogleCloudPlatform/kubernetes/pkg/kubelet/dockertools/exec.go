@@ -21,7 +21,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"time"
 
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/fsouza/go-dockerclient"
@@ -119,23 +118,25 @@ func (*NativeExecHandler) ExecInContainer(client DockerInterface, container *doc
 		RawTerminal:  tty,
 	}
 	err = client.StartExec(execObj.ID, startOpts)
-	if err != nil {
-		return err
-	}
-	tick := time.Tick(2 * time.Second)
-	for {
-		inspect, err2 := client.InspectExec(execObj.ID)
-		if err2 != nil {
-			return err2
+	/*
+		if err != nil {
+			return err
 		}
-		if !inspect.Running {
-			if inspect.ExitCode != 0 {
-				err = &dockerExitError{inspect}
+		tick := time.Tick(2 * time.Second)
+		for {
+			inspect, err2 := client.InspectExec(execObj.ID)
+			if err2 != nil {
+				return err2
 			}
-			break
+			if !inspect.Running {
+				if inspect.ExitCode != 0 {
+					err = &dockerExitError{inspect}
+				}
+				break
+			}
+			<-tick
 		}
-		<-tick
-	}
+	*/
 
 	return err
 }

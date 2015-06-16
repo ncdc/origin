@@ -25,7 +25,6 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -148,26 +147,28 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 		return true
 	}
 
-	wg := &sync.WaitGroup{}
-	wg.Add(2)
+	stop := make(chan struct{}, 1)
 
 	go func() {
+		glog.Infof("ANDY Copying from client to backend")
+		defer glog.Infof("DONE Copying from client to backend")
 		_, err := io.Copy(backendConn, requestHijackedConn)
 		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
 			glog.Errorf("Error proxying data from client to backend: %v", err)
 		}
-		wg.Done()
 	}()
 
 	go func() {
+		glog.Infof("ANDY Copying from backend to client")
+		defer glog.Infof("DONE Copying from backend to client")
 		_, err := io.Copy(requestHijackedConn, backendConn)
 		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
 			glog.Errorf("Error proxying data from backend to client: %v", err)
 		}
-		wg.Done()
+		stop <- struct{}{}
 	}()
 
-	wg.Wait()
+	<-stop
 	return true
 }
 

@@ -64,8 +64,8 @@ func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, 
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
-		ReadTimeout:    5 * time.Minute,
-		WriteTimeout:   5 * time.Minute,
+		ReadTimeout:    2 * time.Second, //5 * time.Minute,
+		WriteTimeout:   2 * time.Second, //5 * time.Minute,
 		MaxHeaderBytes: 1 << 20,
 	}
 	if tlsOptions != nil {

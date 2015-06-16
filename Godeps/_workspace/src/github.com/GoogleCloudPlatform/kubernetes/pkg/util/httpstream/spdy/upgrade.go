@@ -68,6 +68,8 @@ func (u responseUpgrader) UpgradeResponse(w http.ResponseWriter, req *http.Reque
 		return nil
 	}
 
+	glog.Infof("SPDY CONN: local=%s, remote=%s", conn.LocalAddr().String, conn.RemoteAddr().String())
+
 	spdyConn, err := NewServerConnection(conn, newStreamHandler)
 	if err != nil {
 		glog.Errorf("Unable to upgrade: error creating SPDY server connection: %v", err)
