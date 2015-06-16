@@ -515,6 +515,7 @@ func (c *Client) hijack(method, path string, hijackOptions hijackOptions) error 
 	errChanIn := make(chan error, 1)
 	exit := make(chan bool)
 	go func() {
+		defer fmt.Println("ANDY DONE hijack copy to stdout")
 		defer close(exit)
 		defer close(errChanOut)
 		var err error
@@ -527,6 +528,7 @@ func (c *Client) hijack(method, path string, hijackOptions hijackOptions) error 
 		errChanOut <- err
 	}()
 	go func() {
+		defer fmt.Println("ANDY DONE hijack copy from stdin")
 		if hijackOptions.in != nil {
 			_, err := io.Copy(rwc, hijackOptions.in)
 			errChanIn <- err
