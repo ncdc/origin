@@ -15,6 +15,8 @@ import (
 	"sync"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/golang/glog"
 )
 
 // Finds the patchStrategy and patchMergeKey struct tag fields on a given
@@ -54,7 +56,8 @@ func LookupPatchMetadata(t reflect.Type, jsonField string) (reflect.Type, string
 		patchMergeKey := tjf.Tag.Get("patchMergeKey")
 		return tjf.Type, patchStrategy, patchMergeKey, nil
 	}
-	return nil, "", "", fmt.Errorf("unable to find api field in struct %s for the json field %q", t.Name(), jsonField)
+	glog.Errorf("ANDY t=%#v", t)
+	return nil, "", "", fmt.Errorf("unable to find api field in struct %s for the json field %q\nANDY fields=%#v\n", t.Name(), jsonField, fields)
 }
 
 // A field represents a single field found in a struct.
@@ -128,6 +131,7 @@ func (x byIndex) Less(i, j int) bool {
 // The algorithm is breadth-first search over the set of structs to include - the top struct
 // and then any reachable anonymous structs.
 func typeFields(t reflect.Type) []field {
+	glog.Errorf("ANDY starting typeFields for %s", t.Name())
 	// Anonymous fields to explore at the current level and the next.
 	current := []field{}
 	next := []field{{typ: t}}
@@ -148,6 +152,7 @@ func typeFields(t reflect.Type) []field {
 
 		for _, f := range current {
 			if visited[f.typ] {
+				glog.Errorf("ANDY already visited %s", f.typ.Name())
 				continue
 			}
 			visited[f.typ] = true
@@ -294,6 +299,7 @@ func cachedTypeFields(t reflect.Type) []field {
 	f := fieldCache.m[t]
 	fieldCache.RUnlock()
 	if f != nil {
+		glog.Errorf("ANDY returning cached entry for %s", t.Name())
 		return f
 	}
 
