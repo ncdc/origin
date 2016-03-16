@@ -156,19 +156,26 @@ func typeFields(t reflect.Type) []field {
 				continue
 			}
 			visited[f.typ] = true
+			glog.Errorf("ANDY processing %s", f.typ.Name())
 
 			// Scan f.typ for fields to include.
 			for i := 0; i < f.typ.NumField(); i++ {
 				sf := f.typ.Field(i)
+				glog.Errorf("ANDY evaluating field %s", sf.Name)
 				if sf.PkgPath != "" { // unexported
+					glog.Errorf("ANDY skipping because PkgPath != ''")
 					continue
 				}
 				tag := sf.Tag.Get("json")
+				glog.Errorf("ANDY tag=%q", tag)
 				if tag == "-" {
+					glog.Errorf("ANDY skipping because tag is -")
 					continue
 				}
 				name, opts := parseTag(tag)
+				glog.Errorf("ANDY parsedTag name=%q", name)
 				if !isValidTag(name) {
+					glog.Errorf("ANDY not a valid tag")
 					name = ""
 				}
 				index := make([]int, len(f.index)+1)
@@ -176,17 +183,21 @@ func typeFields(t reflect.Type) []field {
 				index[len(f.index)] = i
 
 				ft := sf.Type
+				glog.Errorf("ANDY ft.Name=%q", ft.Name())
 				if ft.Name() == "" && ft.Kind() == reflect.Ptr {
 					// Follow pointer.
+					glog.Errorf("ANDY following pointer")
 					ft = ft.Elem()
 				}
 
 				// Record found field and index sequence.
+				glog.Errorf("ANDY name=%q, !sf.Anonymous=%t, !struct=%t", name, !sf.Anonymous, ft.Kind() != reflect.Struct)
 				if name != "" || !sf.Anonymous || ft.Kind() != reflect.Struct {
 					tagged := name != ""
 					if name == "" {
 						name = sf.Name
 					}
+					glog.Errorf("ANDY appending field with name=%q, type=%q", name, f.typ.Name())
 					fields = append(fields, fillField(field{
 						name:      name,
 						tag:       tagged,
@@ -196,6 +207,7 @@ func typeFields(t reflect.Type) []field {
 						quoted:    opts.Contains("string"),
 					}))
 					if count[f.typ] > 1 {
+						glog.Errorf("ANDY multiple instances")
 						// If there were multiple instances, add a second,
 						// so that the annihilation code will see a duplicate.
 						// It only cares about the distinction between 1 or 2,
@@ -208,13 +220,16 @@ func typeFields(t reflect.Type) []field {
 				// Record new anonymous struct to explore in next round.
 				nextCount[ft]++
 				if nextCount[ft] == 1 {
+					glog.Errorf("ANDY appending anony struct for name=%q", ft.Name())
 					next = append(next, fillField(field{name: ft.Name(), index: index, typ: ft}))
 				}
 			}
 		}
 	}
 
+	glog.Errorf("ANDY Sorting")
 	sort.Sort(byName(fields))
+	glog.Errorf("ANDY Sorted")
 
 	// Delete all fields that are hidden by the Go rules for embedded fields,
 	// except that fields with JSON tags are promoted.
@@ -228,18 +243,24 @@ func typeFields(t reflect.Type) []field {
 		// Find the sequence of fields with the name of this first field.
 		fi := fields[i]
 		name := fi.name
+		glog.Errorf("ANDY name=%q", name)
 		for advance = 1; i+advance < len(fields); advance++ {
 			fj := fields[i+advance]
+			glog.Errorf("ANDY fj.name=%q", fj.name)
 			if fj.name != name {
+				glog.Errorf("ANDY fj.name != name, break")
 				break
 			}
 		}
 		if advance == 1 { // Only one field with this name
+			glog.Errorf("ANDY advance=1, appending %q", name)
 			out = append(out, fi)
 			continue
 		}
 		dominant, ok := dominantField(fields[i : i+advance])
+		glog.Errorf("ANDY dominant=%q, ok=%t", dominant.name, ok)
 		if ok {
+			glog.Errorf("ANDY appending dominant")
 			out = append(out, dominant)
 		}
 	}
