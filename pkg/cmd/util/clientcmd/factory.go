@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	kclient "k8s.io/kubernetes/pkg/client/unversioned"
-	adapter "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	kclientcmd "k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	kclientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/controller"
@@ -1050,17 +1049,16 @@ func podNameForJob(job *batch.Job, kc *kclient.Client, timeout time.Duration, so
 }
 
 // Clients returns an OpenShift and Kubernetes client.
-func (f *Factory) Clients() (*client.Client, *kclient.Client, *kclientset.Clientset, error) {
-	kClient, err := f.Client()
+func (f *Factory) Clients() (*client.Client, *kclientset.Clientset, error) {
+	kClientset, err := f.ClientSet()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
-	kClientset := adapter.FromUnversionedClient(kClient)
 	osClient, err := f.clients.ClientForVersion(nil)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
-	return osClient, kClient, kClientset, nil
+	return osClient, kClientset, nil
 }
 
 // OriginSwaggerSchema returns a swagger API doc for an Origin schema under the /oapi prefix.
