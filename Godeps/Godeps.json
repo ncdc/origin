@@ -3123,6 +3123,10 @@
 			"Rev": "ceefd2213ed29504fff30155163c8f59827734f3"
 		},
 		{
+			"ImportPath": "golang.org/x/time/rate",
+			"Rev": "a4bde12657593d5e90d0533a3e4fd95e635124cb"
+		},
+		{
 			"ImportPath": "google.golang.org/api/cloudmonitoring/v2beta2",
 			"Rev": "a69f0f19d246419bb931b0ac8f4f8d3f3e6d4feb"
 		},
