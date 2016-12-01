@@ -1887,6 +1887,11 @@
 			"Rev": "6b7015e65d366bf3f19b2b2a000a831940f0f7e0"
 		},
 		{
+			"ImportPath": "github.com/grpc-ecosystem/go-grpc-prometheus/examples/testproto",
+			"Comment": "v1.1",
+			"Rev": "6b7015e65d366bf3f19b2b2a000a831940f0f7e0"
+		},
+		{
 			"ImportPath": "github.com/grpc-ecosystem/grpc-gateway/runtime",
 			"Comment": "v1.0.0-8-gf52d055",
 			"Rev": "f52d055dc48aec25854ed7d31862f78913cf17d1"
