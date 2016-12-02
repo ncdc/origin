@@ -17,7 +17,8 @@ import (
 
 	kapi "k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
-	kclient "k8s.io/kubernetes/pkg/client/unversioned"
+	kclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/retry"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	e2e "k8s.io/kubernetes/test/e2e/framework"
 
@@ -148,7 +149,7 @@ func setCreateTestingNSFunc(baseName string, fn e2e.CreateTestingNSFn) {
 
 // createTestingNS delegates to custom namespace creation functions if registered.
 // otherwise, it ensures that kubernetes e2e tests have their service accounts in the privileged and anyuid SCCs
-func createTestingNS(baseName string, c *kclient.Client, labels map[string]string) (*kapi.Namespace, error) {
+func createTestingNS(baseName string, c kclientset.Interface, labels map[string]string) (*kapi.Namespace, error) {
 	// If a custom function exists, call it
 	if fn, exists := customCreateTestingNSFuncs[baseName]; exists {
 		return fn(baseName, c, labels)
@@ -197,9 +198,9 @@ func checkSuiteSkips() {
 	}
 }
 
-func addE2EServiceAccountsToSCC(c *kclient.Client, namespaces []kapi.Namespace, sccName string) {
+func addE2EServiceAccountsToSCC(c kclientset.Interface, namespaces []kapi.Namespace, sccName string) {
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		scc, err := c.SecurityContextConstraints().Get(sccName)
+		scc, err := c.Core().SecurityContextConstraints().Get(sccName)
 		if err != nil {
 			if apierrs.IsNotFound(err) {
 				return nil
@@ -212,7 +213,7 @@ func addE2EServiceAccountsToSCC(c *kclient.Client, namespaces []kapi.Namespace, 
 				scc.Groups = append(scc.Groups, fmt.Sprintf("system:serviceaccounts:%s", ns.Name))
 			}
 		}
-		if _, err := c.SecurityContextConstraints().Update(scc); err != nil {
+		if _, err := c.Core().SecurityContextConstraints().Update(scc); err != nil {
 			return err
 		}
 		return nil
