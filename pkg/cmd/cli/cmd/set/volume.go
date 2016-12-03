@@ -343,7 +343,7 @@ func (v *VolumeOptions) Complete(f *clientcmd.Factory, cmd *cobra.Command, out, 
 	if err != nil {
 		return err
 	}
-	_, _, kc, err := f.Clients()
+	_, kc, err := f.Clients()
 	if err != nil {
 		return err
 	}
@@ -353,7 +353,7 @@ func (v *VolumeOptions) Complete(f *clientcmd.Factory, cmd *cobra.Command, out, 
 	if err != nil {
 		return err
 	}
-	mapper, typer := f.Object(false)
+	mapper, typer := f.Object()
 
 	v.Output = kcmdutil.GetFlagString(cmd, "output")
 	if len(v.Output) > 0 {
@@ -368,7 +368,7 @@ func (v *VolumeOptions) Complete(f *clientcmd.Factory, cmd *cobra.Command, out, 
 	v.Err = errOut
 	v.Mapper = mapper
 	v.Typer = typer
-	v.RESTClientFactory = f.Factory.ClientForMapping
+	v.RESTClientFactory = f.ClientForMapping
 	v.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	v.Encoder = f.JSONEncoder()
 

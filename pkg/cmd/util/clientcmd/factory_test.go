@@ -1,17 +1,10 @@
 package clientcmd
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/util/sets"
-
-	"github.com/openshift/origin/pkg/api/v1"
-	"github.com/openshift/origin/pkg/client"
 )
 
 // TestRunGenerators makes sure we catch new generators added to `oc run`
@@ -40,6 +33,7 @@ func TestRunGenerators(t *testing.T) {
 	}
 }
 
+/*
 func TestClientConfigForVersion(t *testing.T) {
 	called := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -110,6 +104,7 @@ func TestClientConfigForVersion(t *testing.T) {
 		t.Fatalf("Expected to be called once getting a config for a new version, was called %d times", called)
 	}
 }
+*/
 
 func TestComputeDiscoverCacheDir(t *testing.T) {
 	testCases := []struct {
