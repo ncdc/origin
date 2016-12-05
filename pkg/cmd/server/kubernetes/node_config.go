@@ -144,10 +144,11 @@ func BuildKubernetesNodeConfig(options configapi.NodeConfig, enableProxy, enable
 	server.RegisterNode = true
 	server.Address = kubeAddressStr
 	server.Port = int32(kubePort)
-	server.ReadOnlyPort = 0        // no read only access
-	server.CAdvisorPort = 0        // no unsecured cadvisor access
-	server.HealthzPort = 0         // no unsecured healthz access
-	server.HealthzBindAddress = "" // no unsecured healthz access
+	server.Authentication.Anonymous.Enabled = false // no unauthenticated access
+	server.ReadOnlyPort = 0                         // no read only access
+	server.CAdvisorPort = 0                         // no unsecured cadvisor access
+	server.HealthzPort = 0                          // no unsecured healthz access
+	server.HealthzBindAddress = ""                  // no unsecured healthz access
 	server.ClusterDNS = options.DNSIP
 	server.ClusterDomain = options.DNSDomain
 	server.NetworkPluginName = options.NetworkConfig.NetworkPluginName
