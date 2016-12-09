@@ -2728,6 +2728,14 @@ items:
     - ""
     attributeRestrictions: null
     resources:
+    - nodes
+    verbs:
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
     - pods
     verbs:
     - delete
