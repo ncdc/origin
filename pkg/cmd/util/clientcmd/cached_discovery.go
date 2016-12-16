@@ -15,9 +15,9 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-// CachedDiscoveryClient implements the functions that discovery server-supported API groups,
+// cachedDiscoveryClient implements the functions that discovery server-supported API groups,
 // versions and resources.
-type CachedDiscoveryClient struct {
+type cachedDiscoveryClient struct {
 	discovery.DiscoveryInterface
 
 	// cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
@@ -27,8 +27,10 @@ type CachedDiscoveryClient struct {
 	ttl time.Duration
 }
 
+var _ discovery.CachedDiscoveryInterface = &cachedDiscoveryClient{}
+
 // ServerResourcesForGroupVersion returns the supported resources for a group and version.
-func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error) {
+func (d *cachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error) {
 	filename := filepath.Join(d.cacheDirectory, groupVersion, "serverresources.json")
 	cachedBytes, err := d.getCachedFile(filename)
 	// don't fail on errors, we either don't have a file or won't be able to run the cached check. Either way we can fallback.
@@ -53,7 +55,7 @@ func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion stri
 }
 
 // ServerResources returns the supported resources for all groups and versions.
-func (d *CachedDiscoveryClient) ServerResources() (map[string]*unversioned.APIResourceList, error) {
+func (d *cachedDiscoveryClient) ServerResources() (map[string]*unversioned.APIResourceList, error) {
 	apiGroups, err := d.ServerGroups()
 	if err != nil {
 		return nil, err
@@ -70,7 +72,7 @@ func (d *CachedDiscoveryClient) ServerResources() (map[string]*unversioned.APIRe
 	return result, nil
 }
 
-func (d *CachedDiscoveryClient) ServerGroups() (*unversioned.APIGroupList, error) {
+func (d *cachedDiscoveryClient) ServerGroups() (*unversioned.APIGroupList, error) {
 	filename := filepath.Join(d.cacheDirectory, "servergroups.json")
 	cachedBytes, err := d.getCachedFile(filename)
 	// don't fail on errors, we either don't have a file or won't be able to run the cached check. Either way we can fallback.
@@ -94,7 +96,7 @@ func (d *CachedDiscoveryClient) ServerGroups() (*unversioned.APIGroupList, error
 	return liveGroups, nil
 }
 
-func (d *CachedDiscoveryClient) getCachedFile(filename string) ([]byte, error) {
+func (d *cachedDiscoveryClient) getCachedFile(filename string) ([]byte, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -117,7 +119,7 @@ func (d *CachedDiscoveryClient) getCachedFile(filename string) ([]byte, error) {
 	return cachedBytes, nil
 }
 
-func (d *CachedDiscoveryClient) writeCachedFile(filename string, obj runtime.Object) error {
+func (d *cachedDiscoveryClient) writeCachedFile(filename string, obj runtime.Object) error {
 	if err := os.MkdirAll(filepath.Dir(filename), 0755); err != nil {
 		return err
 	}
@@ -130,7 +132,16 @@ func (d *CachedDiscoveryClient) writeCachedFile(filename string, obj runtime.Obj
 	return ioutil.WriteFile(filename, bytes, 0755)
 }
 
+func (d *cachedDiscoveryClient) Fresh() bool {
+	// TODO: implement me
+	return true
+}
+
+func (d *cachedDiscoveryClient) Invalidate() {
+	// TODO: implement me
+}
+
 // NewCachedDiscoveryClient creates a new DiscoveryClient.  cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
-func NewCachedDiscoveryClient(delegate discovery.DiscoveryInterface, cacheDirectory string, ttl time.Duration) *CachedDiscoveryClient {
-	return &CachedDiscoveryClient{DiscoveryInterface: delegate, cacheDirectory: cacheDirectory, ttl: ttl}
+func NewCachedDiscoveryClient(delegate discovery.DiscoveryInterface, cacheDirectory string, ttl time.Duration) *cachedDiscoveryClient {
+	return &cachedDiscoveryClient{DiscoveryInterface: delegate, cacheDirectory: cacheDirectory, ttl: ttl}
 }
