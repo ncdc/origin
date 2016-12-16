@@ -156,7 +156,7 @@ func (o *StartBuildOptions) Complete(f *clientcmd.Factory, in io.Reader, out, er
 	o.Out = out
 	o.ErrOut = errout
 	o.Git = git.NewRepository()
-	o.ClientConfig = f.OpenShiftClientConfig
+	o.ClientConfig = f.OpenShiftClientConfig()
 	o.Mapper, _ = f.Object()
 
 	fromCount := 0

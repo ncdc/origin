@@ -30,7 +30,7 @@ import (
 type ProjectOptions struct {
 	DefaultNamespace string
 	Oclient          *osclient.Client
-	Kclient          *kclientset.Clientset
+	Kclient          kclientset.Interface
 	Out              io.Writer
 
 	Mapper            meta.RESTMapper

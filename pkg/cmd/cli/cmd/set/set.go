@@ -92,7 +92,7 @@ func NewCmdImage(fullName string, f *clientcmd.Factory, out, err io.Writer) *cob
 	cmd.Example = fmt.Sprintf(setImageExample, fullName)
 
 	flags := cmd.Flags()
-	f.ImageResolutionOptions.Bind(flags)
+	f.ImageResolutionOptions().Bind(flags)
 
 	return cmd
 }

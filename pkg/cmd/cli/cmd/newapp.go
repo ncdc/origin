@@ -484,7 +484,7 @@ func CompleteAppConfig(config *newcmd.AppConfig, f *clientcmd.Factory, c *cobra.
 	config.SetOpenShiftClient(osclient, namespace, dockerClient)
 
 	if config.AllowSecretUse {
-		cfg, err := f.OpenShiftClientConfig.ClientConfig()
+		cfg, err := f.ClientConfig()
 		if err != nil {
 			return err
 		}

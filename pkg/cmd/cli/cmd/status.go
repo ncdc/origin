@@ -103,7 +103,7 @@ func (o *StatusOptions) Complete(f *clientcmd.Factory, cmd *cobra.Command, baseC
 		return err
 	}
 
-	config, err := f.OpenShiftClientConfig.ClientConfig()
+	config, err := f.OpenShiftClientConfig().ClientConfig()
 	if err != nil {
 		return err
 	}

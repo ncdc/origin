@@ -238,7 +238,7 @@ func (opts *RegistryOptions) Complete(f *clientcmd.Factory, cmd *cobra.Command, 
 	}
 
 	var nsErr error
-	if opts.namespace, _, nsErr = f.OpenShiftClientConfig.Namespace(); nsErr != nil {
+	if opts.namespace, _, nsErr = f.DefaultNamespace(); nsErr != nil {
 		return fmt.Errorf("error getting namespace: %v", nsErr)
 	}
 

@@ -1,14 +1,12 @@
 package clientcmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/emicklei/go-restful/swagger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -18,7 +16,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	kclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	kclientcmd "k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/controller"
@@ -28,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 
 	buildapi "github.com/openshift/origin/pkg/build/api"
-	"github.com/openshift/origin/pkg/client"
 	"github.com/openshift/origin/pkg/cmd/util"
 	deployapi "github.com/openshift/origin/pkg/deploy/api"
 	deployutil "github.com/openshift/origin/pkg/deploy/util"
@@ -37,7 +33,7 @@ import (
 
 // New creates a default Factory for commands that should share identical server
 // connection behavior. Most commands should use this method to get a factory.
-func New(flags *pflag.FlagSet) kcmdutil.Factory {
+func New(flags *pflag.FlagSet) *Factory {
 	f := NewFactory(nil)
 	f.BindFlags(flags)
 
@@ -45,16 +41,16 @@ func New(flags *pflag.FlagSet) kcmdutil.Factory {
 }
 
 // Factory provides common options for OpenShift commands
-type factory struct {
-	kcmdutil.ClientAccessFactory
+type Factory struct {
+	ClientAccessFactory
 	kcmdutil.ObjectMappingFactory
 	kcmdutil.BuilderFactory
 }
 
-var _ kcmdutil.Factory = &factory{}
+var _ kcmdutil.Factory = &Factory{}
 
 // NewFactory creates an object that holds common methods across all OpenShift commands
-func NewFactory(optionalClientConfig kclientcmd.ClientConfig) kcmdutil.Factory {
+func NewFactory(optionalClientConfig kclientcmd.ClientConfig) *Factory {
 	// clients := &clientCache{
 	// 	clients: make(map[string]*client.Client),
 	// 	configs: make(map[string]*restclient.Config),
@@ -74,31 +70,16 @@ func NewFactory(optionalClientConfig kclientcmd.ClientConfig) kcmdutil.Factory {
 	objectMappingFactory := NewObjectMappingFactory(clientAccessFactory)
 	builderFactory := kcmdutil.NewBuilderFactory(clientAccessFactory, objectMappingFactory)
 
-	return &factory{
+	return &Factory{
 		ClientAccessFactory:  clientAccessFactory,
 		ObjectMappingFactory: objectMappingFactory,
 		BuilderFactory:       builderFactory,
 	}
 }
 
-// TODO REMOVE ME. COPIED FROM KUBE AS PART OF THE COPY/PASTE FOR
-// PrinterForMapping
-// Whether this cmd need watching objects.
-func isWatch(cmd *cobra.Command) bool {
-	if w, err := cmd.Flags().GetBool("watch"); w && err == nil {
-		return true
-	}
-
-	if wo, err := cmd.Flags().GetBool("watch-only"); wo && err == nil {
-		return true
-	}
-
-	return false
-}
-
 // PrintResourceInfos receives a list of resource infos and prints versioned objects if a generic output format was specified
 // otherwise, it iterates through info objects, printing each resource with a unique printer for its mapping
-func (f *factory) PrintResourceInfos(cmd *cobra.Command, infos []*resource.Info, out io.Writer) error {
+func (f *Factory) PrintResourceInfos(cmd *cobra.Command, infos []*resource.Info, out io.Writer) error {
 	printer, generic, err := kcmdutil.PrinterForCommand(cmd)
 	if err != nil {
 		return nil
@@ -151,7 +132,7 @@ func ResourceMapper(f kcmdutil.Factory) *resource.Mapper {
 }
 
 // UpdateObjectEnvironment update the environment variables in object specification.
-func (f *factory) UpdateObjectEnvironment(obj runtime.Object, fn func(*[]api.EnvVar) error) (bool, error) {
+func (f *Factory) UpdateObjectEnvironment(obj runtime.Object, fn func(*[]api.EnvVar) error) (bool, error) {
 	switch t := obj.(type) {
 	case *buildapi.BuildConfig:
 		if t.Spec.Strategy.CustomStrategy != nil {
@@ -169,7 +150,7 @@ func (f *factory) UpdateObjectEnvironment(obj runtime.Object, fn func(*[]api.Env
 
 // ExtractFileContents returns a map of keys to contents, false if the object cannot support such an
 // operation, or an error.
-func (f *factory) ExtractFileContents(obj runtime.Object) (map[string][]byte, bool, error) {
+func (f *Factory) ExtractFileContents(obj runtime.Object) (map[string][]byte, bool, error) {
 	switch t := obj.(type) {
 	case *api.Secret:
 		return t.Data, true, nil
@@ -187,7 +168,7 @@ func (f *factory) ExtractFileContents(obj runtime.Object) (map[string][]byte, bo
 // ApproximatePodTemplateForObject returns a pod template object for the provided source.
 // It may return both an error and a object. It attempt to return the best possible template
 // available at the current time.
-func (f *factory) ApproximatePodTemplateForObject(object runtime.Object) (*api.PodTemplateSpec, error) {
+func (f *Factory) ApproximatePodTemplateForObject(object runtime.Object) (*api.PodTemplateSpec, error) {
 	switch t := object.(type) {
 	case *imageapi.ImageStreamTag:
 		// create a minimal pod spec that uses the image referenced by the istag without any introspection
@@ -220,14 +201,14 @@ func (f *factory) ApproximatePodTemplateForObject(object runtime.Object) (*api.P
 		}
 
 		latestDeploymentName := deployutil.LatestDeploymentNameForConfig(t)
-		deployment, err := kc.ReplicationControllers(t.Namespace).Get(latestDeploymentName)
+		deployment, err := kc.Core().ReplicationControllers(t.Namespace).Get(latestDeploymentName)
 		if err != nil {
 			return fallback, err
 		}
 
 		fallback = deployment.Spec.Template
 
-		pods, err := kc.Pods(deployment.Namespace).List(api.ListOptions{LabelSelector: labels.SelectorFromSet(deployment.Spec.Selector)})
+		pods, err := kc.Core().Pods(deployment.Namespace).List(api.ListOptions{LabelSelector: labels.SelectorFromSet(deployment.Spec.Selector)})
 		if err != nil {
 			return fallback, err
 		}
@@ -265,7 +246,7 @@ func (f *factory) ApproximatePodTemplateForObject(object runtime.Object) (*api.P
 	}
 }
 
-func (f *factory) PodForResource(resource string, timeout time.Duration) (string, error) {
+func (f *Factory) PodForResource(resource string, timeout time.Duration) (string, error) {
 	sortBy := func(pods []*api.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
 	namespace, _, err := f.DefaultNamespace()
 	if err != nil {
@@ -305,7 +286,7 @@ func (f *factory) PodForResource(resource string, timeout time.Duration) (string
 			return "", err
 		}
 		selector := labels.SelectorFromSet(dc.Spec.Selector)
-		pod, _, err := kcmdutil.GetFirstPod(kc, namespace, selector, timeout, sortBy)
+		pod, _, err := kcmdutil.GetFirstPod(kc.Core(), namespace, selector, timeout, sortBy)
 		if err != nil {
 			return "", err
 		}
@@ -364,37 +345,6 @@ func podNameForJob(job *batch.Job, kc kclientset.Interface, timeout time.Duratio
 		return "", err
 	}
 	return pod.Name, nil
-}
-
-// Clients returns an OpenShift and Kubernetes client.
-func (f *factory) Clients() (*client.Client, *kclientset.Clientset, error) {
-	kClientset, err := f.ClientSet()
-	if err != nil {
-		return nil, nil, err
-	}
-	// TODO: how to get origin client?
-	osClient, err := f.clients.ClientForVersion(nil)
-	if err != nil {
-		return nil, nil, err
-	}
-	return osClient, kClientset, nil
-}
-
-// OriginSwaggerSchema returns a swagger API doc for an Origin schema under the /oapi prefix.
-func (f *factory) OriginSwaggerSchema(client *restclient.RESTClient, version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
-	if version.Empty() {
-		return nil, fmt.Errorf("groupVersion cannot be empty")
-	}
-	body, err := client.Get().AbsPath("/").Suffix("swaggerapi", "oapi", version.Version).Do().Raw()
-	if err != nil {
-		return nil, err
-	}
-	var schema swagger.ApiDeclaration
-	err = json.Unmarshal(body, &schema)
-	if err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
-	}
-	return &schema, nil
 }
 
 // FindAllCanonicalResources returns all resource names that map directly to their kind (Kind -> Resource -> Kind)

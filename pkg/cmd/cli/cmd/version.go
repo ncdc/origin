@@ -34,7 +34,7 @@ type VersionOptions struct {
 	Out      io.Writer
 
 	ClientConfig kclientcmd.ClientConfig
-	Clients      func() (*client.Client, *kclientset.Clientset, error)
+	Clients      func() (*client.Client, kclientset.Interface, error)
 
 	Timeout time.Duration
 
@@ -73,7 +73,7 @@ func (o *VersionOptions) Complete(cmd *cobra.Command, f *clientcmd.Factory, out 
 	}
 
 	o.Clients = f.Clients
-	o.ClientConfig = f.OpenShiftClientConfig
+	o.ClientConfig = f.OpenShiftClientConfig()
 
 	if !o.IsServer {
 		// retrieve config timeout and set cmd option

@@ -40,28 +40,32 @@ import (
 )
 
 type ring0Factory struct {
-	clientConfig kclientcmd.ClientConfig
-	// TODO: is it needed?
-	OpenShiftClientConfig kclientcmd.ClientConfig
-	discoveryFactory      kcmdutil.DiscoveryClientFactory
-	// TODO: can we replace this with the upstream version?
-	clientCache             *clientCache
-	ImageResolutionOptions  FlagBinder
+	clientConfig            kclientcmd.ClientConfig
+	imageResolutionOptions  FlagBinder
 	kubeClientAccessFactory kcmdutil.ClientAccessFactory
 }
 
-func NewClientAccessFactory(optionalClientConfig kclientcmd.ClientConfig) kcmdutil.ClientAccessFactory {
+type ClientAccessFactory interface {
+	kcmdutil.ClientAccessFactory
+
+	Clients() (*client.Client, kclientset.Interface, error)
+	OpenShiftClientConfig() kclientcmd.ClientConfig
+	ImageResolutionOptions() FlagBinder
+}
+
+func NewClientAccessFactory(optionalClientConfig kclientcmd.ClientConfig) ClientAccessFactory {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 
 	clientConfig := optionalClientConfig
 	if optionalClientConfig == nil {
 		// TODO: there should be two client configs, one for OpenShift, and one for Kubernetes
-		clientConfig := DefaultClientConfig(flags)
+		clientConfig = DefaultClientConfig(flags)
 		clientConfig = defaultingClientConfig{clientConfig}
 	}
 
 	return &ring0Factory{
-		ImageResolutionOptions:  &imageResolutionOptions{},
+		clientConfig:            clientConfig,
+		imageResolutionOptions:  &imageResolutionOptions{},
 		kubeClientAccessFactory: kcmdutil.NewClientAccessFactoryFromDiscovery(flags, clientConfig, &discoveryFactory{clientConfig: clientConfig}),
 	}
 }
@@ -78,9 +82,8 @@ func (f *discoveryFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface
 		return nil, err
 	}
 
-	// TODO: how to create OS client here?
 	// at this point we've negotiated and can get the client
-	oclient, err := f.clients.ClientForVersion(nil)
+	oclient, err := client.New(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +91,7 @@ func (f *discoveryFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface
 	// TODO: k8s dir is different, I guess we should align
 	// cacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), cfg.Host)
 	cacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube"), cfg.Host)
-	return NewCachedDiscoveryClient(client.NewDiscoveryClient(oclient.RESTClient), cacheDir, time.Duration(10*time.Minute)), nil
+	return kcmdutil.NewCachedDiscoveryClient(client.NewDiscoveryClient(oclient.RESTClient), cacheDir, time.Duration(10*time.Minute)), nil
 }
 
 func DefaultClientConfig(flags *pflag.FlagSet) kclientcmd.ClientConfig {
@@ -113,6 +116,29 @@ func DefaultClientConfig(flags *pflag.FlagSet) kclientcmd.ClientConfig {
 	clientConfig := kclientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides)
 
 	return clientConfig
+}
+
+func (f *ring0Factory) Clients() (*client.Client, kclientset.Interface, error) {
+	kubeClientSet, err := f.ClientSet()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	cfg, err := f.clientConfig.ClientConfig()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	openShiftClient, err := client.New(cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return openShiftClient, kubeClientSet, nil
+}
+
+func (f *ring0Factory) OpenShiftClientConfig() kclientcmd.ClientConfig {
+	return f.clientConfig
 }
 
 func (f *ring0Factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
@@ -279,8 +305,12 @@ func (o *imageResolutionOptions) Bind(f *pflag.FlagSet) {
 	o.bound = true
 }
 
+func (f *ring0Factory) ImageResolutionOptions() FlagBinder {
+	return f.imageResolutionOptions
+}
+
 func (f *ring0Factory) ResolveImage(image string) (string, error) {
-	options := f.ImageResolutionOptions.(*imageResolutionOptions)
+	options := f.imageResolutionOptions.(*imageResolutionOptions)
 	if imageutil.IsDocker(options.Source) {
 		return f.kubeClientAccessFactory.ResolveImage(image)
 	}

@@ -139,11 +139,13 @@ func VersionedPrintObject(fn func(*cobra.Command, meta.RESTMapper, runtime.Objec
 		if list, ok := obj.(*kapi.List); ok {
 			var err error
 			if list.Items, err = convertItemsForDisplayFromDefaultCommand(c, list.Items); err != nil {
+				fmt.Println("err1")
 				return err
 			}
 		} else {
 			result, err := convertItemsForDisplayFromDefaultCommand(c, []runtime.Object{obj})
 			if err != nil {
+				fmt.Println("err2")
 				return err
 			}
 			obj = result[0]
