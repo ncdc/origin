@@ -24,6 +24,7 @@ import (
 	"os"
 	"path"
 	gruntime "runtime"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -162,6 +163,7 @@ type ContentConfig struct {
 // the Kubernetes conventions, but may not be the Kubernetes API.
 func RESTClientFor(config *Config) (*RESTClient, error) {
 	if config.GroupVersion == nil {
+		debug.PrintStack()
 		return nil, fmt.Errorf("GroupVersion is required when initializing a RESTClient")
 	}
 	if config.NegotiatedSerializer == nil {

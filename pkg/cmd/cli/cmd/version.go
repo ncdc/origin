@@ -11,7 +11,6 @@ import (
 
 	kapierrors "k8s.io/kubernetes/pkg/api/errors"
 	kclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	kclientcmd "k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	kcmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	kubeversion "k8s.io/kubernetes/pkg/version"
@@ -137,17 +136,21 @@ func (o VersionOptions) RunVersion() error {
 		}
 		versionHost = clientConfig.Host
 
-		oClient, _, err := o.Clients()
+		oClient, kClient, err := o.Clients()
 		if err != nil {
 			done <- err
 			return
 		}
 
-		kRESTClient, err := restclient.RESTClientFor(clientConfig)
-		if err != nil {
-			done <- err
-			return
-		}
+		// TODO is this ok?
+		kRESTClient := kClient.Core().RESTClient()
+		/*
+			kRESTClient, err := restclient.RESTClientFor(clientConfig)
+			if err != nil {
+				done <- err
+				return
+			}
+		*/
 
 		kubeVersionBody, err := kRESTClient.Get().AbsPath("/version").Do().Raw()
 		switch {

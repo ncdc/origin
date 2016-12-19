@@ -15,9 +15,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -27,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 
 	"github.com/openshift/origin/pkg/api/latest"
-	"github.com/openshift/origin/pkg/api/restmapper"
 	authorizationapi "github.com/openshift/origin/pkg/authorization/api"
 	authorizationreaper "github.com/openshift/origin/pkg/authorization/reaper"
 	buildapi "github.com/openshift/origin/pkg/build/api"
@@ -54,44 +51,15 @@ func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) kcmdutil.O
 }
 
 func (f *ring1Factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
-	kubeMapper, kubeTyper := f.kubeObjectMappingFactory.Object()
-	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
-	if err != nil {
-		return kubeMapper, kubeTyper
-	}
-
-	// if we can't find the server version or its too old to have Kind information in the discovery doc, skip the discovery RESTMapper
-	// and use our hardcoded levels
-	mapper := registered.RESTMapper()
-	if serverVersion, err := discoveryClient.ServerVersion(); err == nil && useDiscoveryRESTMapper(serverVersion.GitVersion) {
-		mapper = restmapper.NewDiscoveryRESTMapper(discoveryClient)
-	}
-
-	mapper = NewShortcutExpander(discoveryClient, kcmdutil.ShortcutExpander{RESTMapper: mapper})
-	return mapper, kapi.Scheme
+	return f.kubeObjectMappingFactory.Object()
 }
 
 func (f *ring1Factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
-	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// enumerate all group resources
-	groupResources, err := discovery.GetAPIGroupResources(discoveryClient)
-	if err != nil {
-		return nil, nil, err
-	}
-	//return f.kubeObjectMappingFactory.UnstructuredObject()
-	// construct unstructured mapper and typer
-	mapper := discovery.NewRESTMapper(groupResources, meta.InterfacesForUnstructured)
-	typer := discovery.NewUnstructuredObjectTyper(groupResources)
-	return NewShortcutExpander(discoveryClient, kcmdutil.ShortcutExpander{RESTMapper: mapper}), typer, nil
+	return f.kubeObjectMappingFactory.UnstructuredObject()
 }
 
 func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 	if latest.OriginKind(mapping.GroupVersionKind) {
-		// TODO this might need tweaking
 		cfg, err := f.clientAccessFactory.ClientConfig()
 		if err != nil {
 			return nil, err
@@ -104,7 +72,6 @@ func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RES
 			cfg.APIPath = "/oapi"
 		}
 		gv := mapping.GroupVersionKind.GroupVersion()
-		cfg.ContentConfig = dynamic.ContentConfig()
 		cfg.GroupVersion = &gv
 		return restclient.RESTClientFor(cfg)
 	}
