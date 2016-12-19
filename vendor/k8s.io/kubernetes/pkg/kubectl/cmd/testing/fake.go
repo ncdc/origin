@@ -233,16 +233,16 @@ func (f *FakeFactory) ClientForMapping(*meta.RESTMapping) (resource.RESTClient, 
 	return f.tf.Client, f.tf.Err
 }
 
-func (f *FakeFactory) FederationClientSetForVersion(version *schema.GroupVersion) (fedclientset.Interface, error) {
+func (f *FakeFactory) FederationClientSetForVersion(version *unversioned.GroupVersion) (fedclientset.Interface, error) {
 	return nil, nil
 }
-func (f *FakeFactory) FederationClientForVersion(version *schema.GroupVersion) (*restclient.RESTClient, error) {
+func (f *FakeFactory) FederationClientForVersion(version *unversioned.GroupVersion) (*restclient.RESTClient, error) {
 	return nil, nil
 }
-func (f *FakeFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (*internalclientset.Clientset, error) {
+func (f *FakeFactory) ClientSetForVersion(requiredVersion *unversioned.GroupVersion) (*internalclientset.Clientset, error) {
 	return nil, nil
 }
-func (f *FakeFactory) ClientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error) {
+func (f *FakeFactory) ClientConfigForVersion(requiredVersion *unversioned.GroupVersion) (*restclient.Config, error) {
 	return nil, nil
 }
 
