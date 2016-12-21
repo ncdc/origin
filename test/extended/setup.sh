@@ -300,6 +300,9 @@ readonly EXCLUDED_TESTS=(
 
 	# tested by networking.sh and requires the environment that script sets up
 	"\[networking\] OVS"
+
+  # this tests dns federation configuration via configmap, which we don't support yet
+	"DNS config map"
 )
 
 readonly SERIAL_TESTS=(
