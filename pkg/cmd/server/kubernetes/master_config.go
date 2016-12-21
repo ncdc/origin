@@ -277,7 +277,7 @@ func BuildKubernetesMasterConfig(options configapi.MasterConfig, requestContextM
 	genericConfig.AdmissionControl = admissionControl
 	genericConfig.RequestContextMapper = requestContextMapper
 	genericConfig.APIResourceConfigSource = getAPIResourceConfig(options)
-	genericConfig.EnableIndex = false // TODO(sttts): get rid of our indexAPIPaths and use this
+	genericConfig.EnableIndex = true
 	genericConfig.OpenAPIConfig = DefaultOpenAPIConfig()
 	genericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 	genericConfig.SwaggerConfig.PostBuildHandler = customizeSwaggerDefinition

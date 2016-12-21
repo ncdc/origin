@@ -159,7 +159,7 @@ func (c *MasterConfig) Run(kc *kubernetes.MasterConfig, assetConfig *AssetConfig
 		glog.Fatalf("Failed to launch master: %v", err)
 	}
 
-	c.InstallProtectedAPI(kmaster.GenericAPIServer.HandlerContainer.Container)
+	c.InstallProtectedAPI(kmaster.GenericAPIServer.HandlerContainer)
 	messages = append(messages, c.kubernetesAPIMessages(kc)...)
 
 	for _, s := range messages {
@@ -199,7 +199,7 @@ func (c *MasterConfig) RunInProxyMode(proxy *kubernetes.ProxyConfig, assetConfig
 	messages = append(messages, fmt.Sprintf("Started OpenAPI Schema at %%s%s", openAPIServePath))
 
 	// install origin handlers
-	c.InstallProtectedAPI(container.Container)
+	c.InstallProtectedAPI(container)
 
 	// TODO(sttts): split cmd/server/kubernetes config generation into generic and master-specific
 	// until then: create ad-hoc config
@@ -304,12 +304,8 @@ func (c *MasterConfig) buildHandlerChain(assetConfig *AssetConfig) (func(http.Ha
 			glog.Fatalf("Failed to setup serving of assets: %v", err)
 		}
 
-		// TODO(sttts): replace with upstream's index handler and make sure the path list matches
-		var kubeAPILevels []string
-		if c.Options.KubernetesMasterConfig != nil {
-			kubeAPILevels = configapi.GetEnabledAPIVersionsForGroup(*c.Options.KubernetesMasterConfig, kapi.GroupName)
-		}
-		handler = indexAPIPaths(c.Options.APILevels, kubeAPILevels, handler)
+		// skip authz/n for the index handler
+		handler = WithPatternsHandler(handler, apiHandler, "/", "")
 
 		if c.WebConsoleEnabled() {
 			handler = WithAssetServerRedirect(handler, c.Options.AssetConfig.PublicURL)
@@ -330,16 +326,13 @@ func (c *MasterConfig) buildHandlerChain(assetConfig *AssetConfig) (func(http.Ha
 }
 
 func (c *MasterConfig) RunHealth() {
-	ws := &restful.WebService{}
-	hc := restful.NewContainer()
-	apiserver.InstallRecoverHandler(kapi.Codecs, hc)
-	hc.Add(ws)
+	apiContainer := genericmux.NewAPIContainer(http.NewServeMux(), kapi.Codecs)
 
-	initHealthCheckRoute(ws, "/healthz")
-	initReadinessCheckRoute(ws, "/healthz/ready", func() bool { return true })
-	initMetricsRoute(ws, "/metrics")
+	healthz.InstallHandler(&apiContainer.NonSwaggerRoutes, healthz.PingHealthz)
+	initReadinessCheckRoute(apiContainer, "/healthz/ready", func() bool { return true })
+	initMetricsRoute(apiContainer, "/metrics")
 
-	c.serve(hc, []string{"Started health checks at %s"})
+	c.serve(apiContainer.ServeMux, []string{"Started health checks at %s"})
 }
 
 // serve starts serving the provided http.Handler using security settings derived from the MasterConfig
@@ -396,7 +389,7 @@ func (c *MasterConfig) InitializeObjects() {
 	c.ensureOpenShiftSharedResourcesNamespace()
 }
 
-func (c *MasterConfig) InstallProtectedAPI(container *restful.Container) ([]string, error) {
+func (c *MasterConfig) InstallProtectedAPI(apiContainer *genericmux.APIContainer) ([]string, error) {
 	// initialize OpenShift API
 	storage := c.GetRestStorage()
 
@@ -405,42 +398,36 @@ func (c *MasterConfig) InstallProtectedAPI(container *restful.Container) ([]stri
 	currentAPIVersions := []string{}
 
 	if configapi.HasOpenShiftAPILevel(c.Options, v1.SchemeGroupVersion.Version) {
-		if err := c.apiLegacyV1(storage).InstallREST(container); err != nil {
+		if err := c.apiLegacyV1(storage).InstallREST(apiContainer.Container); err != nil {
 			glog.Fatalf("Unable to initialize v1 API: %v", err)
 		}
 		messages = append(messages, fmt.Sprintf("Started Origin API at %%s%s/%s", api.Prefix, v1.SchemeGroupVersion.Version))
 		currentAPIVersions = append(currentAPIVersions, v1.SchemeGroupVersion.Version)
 	}
 
-	var root *restful.WebService
-	for _, service := range container.RegisteredWebServices() {
-		switch service.RootPath() {
-		case "/":
-			root = service
-		case api.Prefix + "/" + v1.SchemeGroupVersion.Version:
+	// fix API doc string
+	for _, service := range apiContainer.Container.RegisteredWebServices() {
+		if service.RootPath() == api.Prefix + "/" + v1.SchemeGroupVersion.Version {
 			service.Doc("OpenShift REST API, version v1").ApiVersion("v1")
 		}
-	}
-
-	if root == nil {
-		root = new(restful.WebService)
-		container.Add(root)
 	}
 
 	// The old API prefix must continue to return 200 (with an empty versions
 	// list) for backwards compatibility, even though we won't service any other
 	// requests through the route. Take care when considering whether to delete
 	// this route.
-	initAPIVersionRoute(root, api.LegacyPrefix, legacyAPIVersions...)
-	initAPIVersionRoute(root, api.Prefix, currentAPIVersions...)
+	initAPIVersionRoute(apiContainer, api.LegacyPrefix, legacyAPIVersions...)
+	initAPIVersionRoute(apiContainer, api.Prefix, currentAPIVersions...)
 
-	initControllerRoutes(root, "/controllers", c.Options.Controllers != configapi.ControllersDisabled, c.ControllerPlug)
-	initReadinessCheckRoute(root, "/healthz/ready", c.ProjectAuthorizationCache.ReadyForAccess)
-	initVersionRoute(container, "/version/openshift")
+	initControllerRoutes(apiContainer, "/controllers", c.Options.Controllers != configapi.ControllersDisabled, c.ControllerPlug)
+	// TODO(sttts): use upstream healthz checks for the /healthz/ready route
+	initReadinessCheckRoute(apiContainer, "/healthz/ready", c.ProjectAuthorizationCache.ReadyForAccess)
+	// TODO(sttts): use upstream version route
+	initVersionRoute(apiContainer.Container, "/version/openshift")
 
 	// Set up OAuth metadata only if we are configured to use OAuth
 	if c.Options.OAuthConfig != nil {
-		initOAuthAuthorizationServerMetadataRoute(container, oauthMetadataEndpoint, c.Options.OAuthConfig.MasterPublicURL)
+		initOAuthAuthorizationServerMetadataRoute(apiContainer, oauthMetadataEndpoint, c.Options.OAuthConfig.MasterPublicURL)
 	}
 
 	return messages, nil
@@ -456,18 +443,18 @@ func initVersionRoute(container *restful.Container, path string) {
 	}
 
 	// Set up a service to return the git code version.
-	versionWS := new(restful.WebService)
-	versionWS.Path(path)
-	versionWS.Doc("git code version from which this is built")
-	versionWS.Route(
-		versionWS.GET("/").To(func(_ *restful.Request, resp *restful.Response) {
+	ws := new(restful.WebService)
+	ws.Path(path)
+	ws.Doc("git code version from which this is built")
+	ws.Route(
+		ws.GET("/").To(func(_ *restful.Request, resp *restful.Response) {
 			writeJSON(resp, versionInfo)
 		}).
 			Doc("get the code version").
 			Operation("getCodeVersion").
 			Produces(restful.MIME_JSON))
 
-	container.Add(versionWS)
+	container.Add(ws)
 }
 
 func writeJSON(resp *restful.Response, json []byte) {
@@ -479,7 +466,7 @@ func writeJSON(resp *restful.Response, json []byte) {
 // initOAuthAuthorizationServerMetadataRoute initializes an HTTP endpoint for OAuth 2.0 Authorization Server Metadata discovery
 // https://tools.ietf.org/id/draft-ietf-oauth-discovery-04.html#rfc.section.2
 // masterPublicURL should be internally and externally routable to allow all users to discover this information
-func initOAuthAuthorizationServerMetadataRoute(container *restful.Container, path, masterPublicURL string) {
+func initOAuthAuthorizationServerMetadataRoute(apiContainer *genericmux.APIContainer, path, masterPublicURL string) {
 	// Build OAuth metadata once
 	metadata, err := json.MarshalIndent(discovery.Get(masterPublicURL, OpenShiftOAuthAuthorizeURL(masterPublicURL), OpenShiftOAuthTokenURL(masterPublicURL)), "", "  ")
 	if err != nil {
@@ -487,19 +474,23 @@ func initOAuthAuthorizationServerMetadataRoute(container *restful.Container, pat
 		return
 	}
 
+	secretContainer := restful.Container{
+		ServeMux: apiContainer.SecretRoutes.(*http.ServeMux), // we know it's a *http.ServeMux. In kube 1.6, the type will actually be correct.
+	}
+
 	// Set up a service to return the OAuth metadata.
-	oauthWS := new(restful.WebService)
-	oauthWS.Path(path)
-	oauthWS.Doc("OAuth 2.0 Authorization Server Metadata")
-	oauthWS.Route(
-		oauthWS.GET("/").To(func(_ *restful.Request, resp *restful.Response) {
+	ws := new(restful.WebService)
+	ws.Path(path)
+	ws.Doc("OAuth 2.0 Authorization Server Metadata")
+	ws.Route(
+		ws.GET("/").To(func(_ *restful.Request, resp *restful.Response) {
 			writeJSON(resp, metadata)
 		}).
 			Doc("get the server's OAuth 2.0 Authorization Server Metadata").
 			Operation("getOAuthAuthorizationServerMetadata").
 			Produces(restful.MIME_JSON))
 
-	container.Add(oauthWS)
+	secretContainer.Add(ws)
 }
 
 func (c *MasterConfig) GetRestStorage() map[string]rest.Storage {
@@ -788,7 +779,7 @@ func checkStorageErr(err error) {
 }
 
 // initAPIVersionRoute initializes the osapi endpoint to behave similar to the upstream api endpoint
-func initAPIVersionRoute(root *restful.WebService, prefix string, versions ...string) {
+func initAPIVersionRoute(apiContainer *genericmux.APIContainer, prefix string, versions ...string) {
 	versionHandler := apiserver.APIVersionHandler(kapi.Codecs, func(req *restful.Request) *unversioned.APIVersions {
 		apiVersionsForDiscovery := unversioned.APIVersions{
 			// TODO: ServerAddressByClientCIDRs: s.getServerAddressByClientCIDRs(req.Request),
@@ -796,27 +787,23 @@ func initAPIVersionRoute(root *restful.WebService, prefix string, versions ...st
 		}
 		return &apiVersionsForDiscovery
 	})
-	root.Route(root.GET(prefix).To(versionHandler).
+	ws := new(restful.WebService).
+		Path(prefix).
+		Doc("list supported server API versions")
+	ws.Route(ws.GET("/").To(versionHandler).
 		Doc("list supported server API versions").
 		Produces(restful.MIME_JSON).
 		Consumes(restful.MIME_JSON).
 		Operation("get" + strings.Title(prefix[1:]) + "Version"))
-}
-
-// initHealthCheckRoute initializes an HTTP endpoint for health checking.
-// OpenShift is deemed healthy if the API server can respond with an OK messages
-func initHealthCheckRoute(root *restful.WebService, path string) {
-	root.Route(root.GET(path).To(func(req *restful.Request, resp *restful.Response) {
-		resp.ResponseWriter.WriteHeader(http.StatusOK)
-		resp.ResponseWriter.Write([]byte("ok"))
-	}).Doc("return the health state of the master").
-		Returns(http.StatusOK, "if master is healthy", nil).
-		Produces(restful.MIME_JSON))
+	apiContainer.Add(ws)
 }
 
 // initReadinessCheckRoute initializes an HTTP endpoint for readiness checking
-func initReadinessCheckRoute(root *restful.WebService, path string, readyFunc func() bool) {
-	root.Route(root.GET(path).To(func(req *restful.Request, resp *restful.Response) {
+func initReadinessCheckRoute(apiContainer *genericmux.APIContainer, path string, readyFunc func() bool) {
+	ws := new(restful.WebService).
+		Path(path).
+		Doc("return the readiness state of the master")
+	ws.Route(ws.GET("/").To(func(req *restful.Request, resp *restful.Response) {
 		if readyFunc() {
 			resp.ResponseWriter.WriteHeader(http.StatusOK)
 			resp.ResponseWriter.Write([]byte("ok"))
@@ -828,16 +815,23 @@ func initReadinessCheckRoute(root *restful.WebService, path string, readyFunc fu
 		Returns(http.StatusOK, "if the master is ready", nil).
 		Returns(http.StatusServiceUnavailable, "if the master is not ready", nil).
 		Produces(restful.MIME_JSON))
+
+	apiContainer.Add(ws)
 }
 
 // initMetricsRoute initializes an HTTP endpoint for metrics.
-func initMetricsRoute(root *restful.WebService, path string) {
+func initMetricsRoute(apiContainer *genericmux.APIContainer, path string) {
+	ws := new(restful.WebService).
+		Path(path).
+		Doc("return metrics for this process")
 	h := prometheus.Handler()
-	root.Route(root.GET(path).To(func(req *restful.Request, resp *restful.Response) {
+	ws.Route(ws.GET("/").To(func(req *restful.Request, resp *restful.Response) {
 		h.ServeHTTP(resp.ResponseWriter, req.Request)
 	}).Doc("return metrics for this process").
 		Returns(http.StatusOK, "if metrics are available", nil).
 		Produces("text/plain"))
+
+	apiContainer.Add(ws)
 }
 
 func (c *MasterConfig) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
@@ -935,4 +929,16 @@ type clientDeploymentInterface struct {
 // GetDeployment returns the deployment with the provided context and name
 func (c clientDeploymentInterface) GetDeployment(ctx kapi.Context, name string) (*kapi.ReplicationController, error) {
 	return c.KubeClient.Core().ReplicationControllers(kapi.NamespaceValue(ctx)).Get(name)
+}
+
+func WithPatternsHandler(handler http.Handler, patternHandler http.Handler, patterns ...string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		for _, p := range patterns {
+			if req.URL.Path == p {
+				patternHandler.ServeHTTP(w, req)
+				return
+			}
+		}
+		handler.ServeHTTP(w, req)
+	})
 }
