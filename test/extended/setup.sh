@@ -276,6 +276,9 @@ readonly EXCLUDED_TESTS=(
 	# (gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab) because it is a v1
 	# image and we can only pull v2
 	"Proxy version v1.*should proxy through a service and a pod"
+
+  # this tests dns federation configuration via configmap, which we don't support yet
+	"DNS config map"
 )
 
 readonly SERIAL_TESTS=(
