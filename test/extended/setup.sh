@@ -271,6 +271,11 @@ readonly EXCLUDED_TESTS=(
 
 	# tested by networking.sh and requires the environment that script sets up
 	"\[networking\] OVS"
+
+	# currently unable to pull the image this test uses
+	# (gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab) because it is a v1
+	# image and we can only pull v2
+	"Proxy version v1.*should proxy through a service and a pod"
 )
 
 readonly SERIAL_TESTS=(
