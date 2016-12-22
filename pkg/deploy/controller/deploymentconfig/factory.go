@@ -53,13 +53,11 @@ func NewDeploymentConfigController(dcInformer, rcInformer, podInformer cache.Sha
 	})
 	c.rcStore.Indexer = rcInformer.GetIndexer()
 	rcInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.addReplicationController,
 		UpdateFunc: c.updateReplicationController,
 		DeleteFunc: c.deleteReplicationController,
 	})
 	c.podStore.Indexer = podInformer.GetIndexer()
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.addPod,
 		UpdateFunc: c.updatePod,
 		DeleteFunc: c.deletePod,
 	})
