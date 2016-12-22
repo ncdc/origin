@@ -10,7 +10,7 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/fsouza/go-dockerclient"
 
-	kclient "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/retry"
 
 	"github.com/openshift/origin/pkg/build/api"
 	"github.com/openshift/origin/pkg/client"
@@ -177,7 +177,7 @@ func updateBuildRevision(build *api.Build, sourceInfo *git.SourceInfo) *api.Sour
 }
 
 func retryBuildStatusUpdate(build *api.Build, client client.BuildInterface, sourceRev *api.SourceRevision) error {
-	return kclient.RetryOnConflict(kclient.DefaultBackoff, func() error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		// before updating, make sure we are using the latest version of the build
 		latestBuild, err := client.Get(build.Name)
 		if err != nil {
