@@ -1,19 +1,36 @@
-.TH "OPENSHIFT KUBE" "1" " Openshift CLI User Manuals" "Openshift" "June 2016"  ""
+.TH "OPENSHIFT KUBE CERTIFICATE" "1" " Openshift CLI User Manuals" "Openshift" "June 2016"  ""
 
 
 .SH NAME
 .PP
-openshift kube namespace \- Deprecated: config set\-context
+openshift kube certificate deny \- Deny a certificate signing request
 
 
 .SH SYNOPSIS
 .PP
-\fBopenshift kube namespace\fP [OPTIONS]
+\fBopenshift kube certificate deny\fP [OPTIONS]
 
 
 .SH DESCRIPTION
 .PP
-Deprecated: This command is deprecated, all its functionalities are covered by "kubectl config set\-context"
+Deny a certificate signing request.
+
+.PP
+kubectl certificate deny allows a cluster admin to deny a certificate signing request (CSR). This action tells a certificate signing controller to not to issue a certificate to the requestor.
+
+
+.SH OPTIONS
+.PP
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename, directory, or URL to files identifying the resource to update
+
+.PP
+\fB\-o\fP, \fB\-\-output\fP=""
+    Output mode. Use "\-o name" for shorter output (resource/name).
+
+.PP
+\fB\-R\fP, \fB\-\-recursive\fP=false
+    Process the directory used in \-f, \-\-filename recursively. Useful when you want to manage related manifests organized within the same directory.
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -123,7 +140,7 @@ Deprecated: This command is deprecated, all its functionalities are covered by "
 
 .PP
 \fB\-\-ir\-dbname\fP="k8s"
-    InfluxDB database name which contains metrics requred by InitialResources
+    InfluxDB database name which contains metrics required by InitialResources
 
 .PP
 \fB\-\-ir\-hawkular\fP=""
@@ -131,7 +148,7 @@ Deprecated: This command is deprecated, all its functionalities are covered by "
 
 .PP
 \fB\-\-ir\-influxdb\-host\fP="localhost:8080/api/v1/proxy/namespaces/kube\-system/services/monitoring\-influxdb:api"
-    Address of InfluxDB which contains metrics requred by InitialResources
+    Address of InfluxDB which contains metrics required by InitialResources
 
 .PP
 \fB\-\-ir\-namespace\-only\fP=false
@@ -244,7 +261,7 @@ Deprecated: This command is deprecated, all its functionalities are covered by "
 
 .SH SEE ALSO
 .PP
-\fBopenshift\-kube(1)\fP,
+\fBopenshift\-kube\-certificate(1)\fP,
 
 
 .SH HISTORY

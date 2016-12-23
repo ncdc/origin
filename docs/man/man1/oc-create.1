@@ -25,8 +25,12 @@ JSON and YAML formats are accepted.
     If true, only print the object that would be sent, without sending it.
 
 .PP
+\fB\-\-edit\fP=false
+    Edit the API resource before creating
+
+.PP
 \fB\-f\fP, \fB\-\-filename\fP=[]
-    Filename, directory, or URL to file to use to create the resource
+    Filename, directory, or URL to files to use to create the resource
 
 .PP
 \fB\-\-include\-extended\-apis\fP=true
@@ -83,6 +87,10 @@ JSON and YAML formats are accepted.
 .PP
 \fB\-\-validate\fP=false
     If true, use a schema to validate the input before sending it
+
+.PP
+\fB\-\-windows\-line\-endings\fP=false
+    Only relevant if \-\-edit=true. Use Windows line\-endings (default Unix line\-endings)
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS

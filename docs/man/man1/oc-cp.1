@@ -1,22 +1,25 @@
-.TH "OC CONFIG" "1" " Openshift CLI User Manuals" "Openshift" "June 2016"  ""
+.TH "OC" "1" " Openshift CLI User Manuals" "Openshift" "June 2016"  ""
 
 
 .SH NAME
 .PP
-oc config unset \- Unsets an individual value in a kubeconfig file
+oc cp \- Copy files and directories to and from containers.
 
 
 .SH SYNOPSIS
 .PP
-\fBoc config unset\fP [OPTIONS]
+\fBoc cp\fP [OPTIONS]
 
 
 .SH DESCRIPTION
 .PP
-Unsets an individual value in a kubeconfig file
+Copy files and directories to and from containers.
 
+
+.SH OPTIONS
 .PP
-PROPERTY \_NAME is a dot delimited name where each token represents either an attribute name or a map key.  Map keys may not contain dots.
+\fB\-c\fP, \fB\-\-container\fP=""
+    Container name. If omitted, the first container in the pod will be chosen
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -46,7 +49,7 @@ PROPERTY \_NAME is a dot delimited name where each token represents either an at
 
 .PP
 \fB\-\-config\fP=""
-    use a particular kubeconfig file
+    Path to the config file to use for CLI requests.
 
 .PP
 \fB\-\-context\fP=""
@@ -89,9 +92,34 @@ PROPERTY \_NAME is a dot delimited name where each token represents either an at
     The name of the kubeconfig user to use
 
 
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+  # !!!Important Note!!!
+  # Requires that the 'tar' binary is present in your container
+  # image.  If 'tar' is not present, 'kubectl cp' will fail.
+  
+  # Copy /tmp/foo\_dir local directory to /tmp/bar\_dir in a remote pod in the default namespace
+  oc cp /tmp/foo\_dir <some\-pod>:/tmp/bar\_dir
+  
+  # Copy /tmp/foo local file to /tmp/bar in a remote pod in a specific container
+  oc cp /tmp/foo <some\-pod>:/tmp/bar \-c <specific\-container>
+  
+  # Copy /tmp/foo local file to /tmp/bar in a remote pod in namespace <some\-namespace>
+  oc cp /tmp/foo <some\-namespace>/<some\-pod>:/tmp/bar
+  
+  # Copy /tmp/foo from a remote pod to /tmp/bar locally
+  oc cp <some\-namespace>/<some\-pod>:/tmp/foo /tmp/bar
+
+.fi
+.RE
+
+
 .SH SEE ALSO
 .PP
-\fBoc\-config(1)\fP,
+\fBoc(1)\fP,
 
 
 .SH HISTORY
