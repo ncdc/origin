@@ -1,77 +1,39 @@
-.TH "OPENSHIFT KUBE CREATE" "1" " Openshift CLI User Manuals" "Openshift" "June 2016"  ""
+.TH "OPENSHIFT KUBE CERTIFICATE" "1" " Openshift CLI User Manuals" "Openshift" "June 2016"  ""
 
 
 .SH NAME
 .PP
-openshift kube create serviceaccount \- Create a service account with the specified name
+openshift kube certificate approve \- Approve a certificate signing request
 
 
 .SH SYNOPSIS
 .PP
-\fBopenshift kube create serviceaccount\fP [OPTIONS]
+\fBopenshift kube certificate approve\fP [OPTIONS]
 
 
 .SH DESCRIPTION
 .PP
-Create a service account with the specified name.
+Approve a certificate signing request.
+
+.PP
+kubectl certificate approve allows a cluster admin to approve a certificate signing request (CSR). This action tells a certificate signing controller to issue a certificate to the requestor with the attributes requested in the CSR.
+
+.PP
+SECURITY NOTICE: Depending on the requested attributes, the issued certificate can potentially grant a requester access to cluster resources or to authenticate as a requested identity. Before approving a CSR, ensure you understand what the signed certificate can do.
 
 
 .SH OPTIONS
 .PP
-\fB\-\-dry\-run\fP=false
-    If true, only print the object that would be sent, without sending it.
-
-.PP
-\fB\-\-generator\fP="serviceaccount/v1"
-    The name of the API generator to use.
-
-.PP
-\fB\-\-include\-extended\-apis\fP=true
-    If true, include definitions of new APIs via calls to the API server. [default true]
-
-.PP
-\fB\-\-no\-headers\fP=false
-    When using the default or custom\-column output format, don't print headers.
+\fB\-f\fP, \fB\-\-filename\fP=[]
+    Filename, directory, or URL to files identifying the resource to update
 
 .PP
 \fB\-o\fP, \fB\-\-output\fP=""
-    Output format. One of: json|yaml|wide|name|custom\-columns=...|custom\-columns\-file=...|go\-template=...|go\-template\-file=...|jsonpath=...|jsonpath\-file=... See custom columns [
-\[la]http://kubernetes.io/docs/user-guide/kubectl-overview/#custom-columns\[ra]], golang template [
-\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]] and jsonpath template [
-\[la]http://kubernetes.io/docs/user-guide/jsonpath\[ra]].
+    Output mode. Use "\-o name" for shorter output (resource/name).
 
 .PP
-\fB\-\-output\-version\fP=""
-    Output the formatted object with the given group version (for ex: 'extensions/v1beta1').
-
-.PP
-\fB\-\-save\-config\fP=false
-    If true, the configuration of current object will be saved in its annotation. This is useful when you want to perform kubectl apply on this object in the future.
-
-.PP
-\fB\-\-schema\-cache\-dir\fP="\~/.kube/schema"
-    If non\-empty, load/store cached API schemas in this directory, default is '$HOME/.kube/schema'
-
-.PP
-\fB\-a\fP, \fB\-\-show\-all\fP=false
-    When printing, show all resources (default hide terminated pods.)
-
-.PP
-\fB\-\-show\-labels\fP=false
-    When printing, show all labels as the last column (default hide labels column)
-
-.PP
-\fB\-\-sort\-by\fP=""
-    If non\-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. '{.metadata.name}'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
-
-.PP
-\fB\-\-template\fP=""
-    Template string or path to template file to use when \-o=go\-template, \-o=go\-template\-file. The template format is golang templates [
-\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]].
-
-.PP
-\fB\-\-validate\fP=true
-    If true, use a schema to validate the input before sending it
+\fB\-R\fP, \fB\-\-recursive\fP=false
+    Process the directory used in \-f, \-\-filename recursively. Useful when you want to manage related manifests organized within the same directory.
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -300,21 +262,9 @@ Create a service account with the specified name.
     comma\-separated list of pattern=N settings for file\-filtered logging
 
 
-.SH EXAMPLE
-.PP
-.RS
-
-.nf
-  # Create a new service account named my\-service\-account
-  $ kubectl create serviceaccount my\-service\-account
-
-.fi
-.RE
-
-
 .SH SEE ALSO
 .PP
-\fBopenshift\-kube\-create(1)\fP,
+\fBopenshift\-kube\-certificate(1)\fP,
 
 
 .SH HISTORY

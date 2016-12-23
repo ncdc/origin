@@ -185,7 +185,7 @@ Create a nodeport service with the specified name.
 
 .PP
 \fB\-\-ir\-dbname\fP="k8s"
-    InfluxDB database name which contains metrics requred by InitialResources
+    InfluxDB database name which contains metrics required by InitialResources
 
 .PP
 \fB\-\-ir\-hawkular\fP=""
@@ -193,7 +193,7 @@ Create a nodeport service with the specified name.
 
 .PP
 \fB\-\-ir\-influxdb\-host\fP="localhost:8080/api/v1/proxy/namespaces/kube\-system/services/monitoring\-influxdb:api"
-    Address of InfluxDB which contains metrics requred by InitialResources
+    Address of InfluxDB which contains metrics required by InitialResources
 
 .PP
 \fB\-\-ir\-namespace\-only\fP=false
@@ -309,9 +309,8 @@ Create a nodeport service with the specified name.
 .RS
 
 .nf
-
-# Create a new nodeport service named my\-ns
-kubectl create service nodeport my\-ns \-\-tcp=5678:8080
+  # Create a new nodeport service named my\-ns
+  kubectl create service nodeport my\-ns \-\-tcp=5678:8080
 
 .fi
 .RE

@@ -1,77 +1,25 @@
-.TH "OPENSHIFT KUBE CREATE" "1" " Openshift CLI User Manuals" "Openshift" "June 2016"  ""
+.TH "OPENSHIFT KUBE" "1" " Openshift CLI User Manuals" "Openshift" "June 2016"  ""
 
 
 .SH NAME
 .PP
-openshift kube create serviceaccount \- Create a service account with the specified name
+openshift kube cp \- Copy files and directories to and from containers.
 
 
 .SH SYNOPSIS
 .PP
-\fBopenshift kube create serviceaccount\fP [OPTIONS]
+\fBopenshift kube cp\fP [OPTIONS]
 
 
 .SH DESCRIPTION
 .PP
-Create a service account with the specified name.
+Copy files and directories to and from containers.
 
 
 .SH OPTIONS
 .PP
-\fB\-\-dry\-run\fP=false
-    If true, only print the object that would be sent, without sending it.
-
-.PP
-\fB\-\-generator\fP="serviceaccount/v1"
-    The name of the API generator to use.
-
-.PP
-\fB\-\-include\-extended\-apis\fP=true
-    If true, include definitions of new APIs via calls to the API server. [default true]
-
-.PP
-\fB\-\-no\-headers\fP=false
-    When using the default or custom\-column output format, don't print headers.
-
-.PP
-\fB\-o\fP, \fB\-\-output\fP=""
-    Output format. One of: json|yaml|wide|name|custom\-columns=...|custom\-columns\-file=...|go\-template=...|go\-template\-file=...|jsonpath=...|jsonpath\-file=... See custom columns [
-\[la]http://kubernetes.io/docs/user-guide/kubectl-overview/#custom-columns\[ra]], golang template [
-\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]] and jsonpath template [
-\[la]http://kubernetes.io/docs/user-guide/jsonpath\[ra]].
-
-.PP
-\fB\-\-output\-version\fP=""
-    Output the formatted object with the given group version (for ex: 'extensions/v1beta1').
-
-.PP
-\fB\-\-save\-config\fP=false
-    If true, the configuration of current object will be saved in its annotation. This is useful when you want to perform kubectl apply on this object in the future.
-
-.PP
-\fB\-\-schema\-cache\-dir\fP="\~/.kube/schema"
-    If non\-empty, load/store cached API schemas in this directory, default is '$HOME/.kube/schema'
-
-.PP
-\fB\-a\fP, \fB\-\-show\-all\fP=false
-    When printing, show all resources (default hide terminated pods.)
-
-.PP
-\fB\-\-show\-labels\fP=false
-    When printing, show all labels as the last column (default hide labels column)
-
-.PP
-\fB\-\-sort\-by\fP=""
-    If non\-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. '{.metadata.name}'). The field in the API resource specified by this JSONPath expression must be an integer or a string.
-
-.PP
-\fB\-\-template\fP=""
-    Template string or path to template file to use when \-o=go\-template, \-o=go\-template\-file. The template format is golang templates [
-\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]].
-
-.PP
-\fB\-\-validate\fP=true
-    If true, use a schema to validate the input before sending it
+\fB\-c\fP, \fB\-\-container\fP=""
+    Container name. If omitted, the first container in the pod will be chosen
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -305,8 +253,21 @@ Create a service account with the specified name.
 .RS
 
 .nf
-  # Create a new service account named my\-service\-account
-  $ kubectl create serviceaccount my\-service\-account
+  # !!!Important Note!!!
+  # Requires that the 'tar' binary is present in your container
+  # image.  If 'tar' is not present, 'kubectl cp' will fail.
+  
+  # Copy /tmp/foo\_dir local directory to /tmp/bar\_dir in a remote pod in the default namespace
+  kubectl cp /tmp/foo\_dir <some\-pod>:/tmp/bar\_dir
+  
+  # Copy /tmp/foo local file to /tmp/bar in a remote pod in a specific container
+  kubectl cp /tmp/foo <some\-pod>:/tmp/bar \-c <specific\-container>
+  
+  # Copy /tmp/foo local file to /tmp/bar in a remote pod in namespace <some\-namespace>
+  kubectl cp /tmp/foo <some\-namespace>/<some\-pod>:/tmp/bar
+  
+  # Copy /tmp/foo from a remote pod to /tmp/bar locally
+  kubectl cp <some\-namespace>/<some\-pod>:/tmp/foo /tmp/bar
 
 .fi
 .RE
@@ -314,7 +275,7 @@ Create a service account with the specified name.
 
 .SH SEE ALSO
 .PP
-\fBopenshift\-kube\-create(1)\fP,
+\fBopenshift\-kube(1)\fP,
 
 
 .SH HISTORY
