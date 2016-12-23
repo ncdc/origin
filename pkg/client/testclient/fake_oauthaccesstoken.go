@@ -41,7 +41,7 @@ func (c *FakeOAuthAccessTokens) Get(name string) (*oauthapi.OAuthAccessToken, er
 }
 
 func (c *FakeOAuthAccessTokens) List(opts kapi.ListOptions) (*oauthapi.OAuthAccessTokenList, error) {
-	obj, err := c.Fake.Invokes(ktestclient.NewRootListAction("oauthaccesstokens", opts), &oauthapi.OAuthAccessTokenList{})
+	obj, err := c.Fake.Invokes(core.NewRootListAction(oAuthAccessTokensResource, opts), &oauthapi.OAuthAccessTokenList{})
 	if obj == nil {
 		return nil, err
 	}
