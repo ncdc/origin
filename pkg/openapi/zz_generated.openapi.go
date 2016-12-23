@@ -8175,7 +8175,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 					"namespaces": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Namespaces slices the usage by project.  This division allows for quick resolution of deletion reconcilation inside of a single project without requiring a recalculation across all projects.  This can be used to pull the deltas for a given project.",
+							Description: "Namespaces slices the usage by project.  This division allows for quick resolution of deletion reconciliation inside of a single project without requiring a recalculation across all projects.  This can be used to pull the deltas for a given project.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -9381,6 +9381,12 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
+					"lastUpdateTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The last time this condition was updated.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
+						},
+					},
 					"lastTransitionTime": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The last time the condition transitioned from one status to another.",
@@ -9714,6 +9720,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
+				Required: []string{"latestVersion", "observedGeneration", "replicas", "updatedReplicas", "availableReplicas", "unavailableReplicas"},
 			},
 		},
 		Dependencies: []string{
@@ -9934,6 +9941,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 									},
 								},
 							},
+						},
+					},
+					"activeDeadlineSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ActiveDeadlineSeconds is the duration in seconds that the deployer pods for this deployment config may be active on a node before the system actively tries to terminate them.",
+							Type:        []string{"integer"},
+							Format:      "int64",
 						},
 					},
 				},
@@ -11352,6 +11366,45 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{
 			"unversioned.ListMeta", "v1.Group"},
+	},
+	"v1.GroupRestriction": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "GroupRestriction matches a group either by a string match on the group name or a label selector applied to group labels.",
+				Properties: map[string]spec.Schema{
+					"groups": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Groups is a list of groups used to match against an individual user's groups. If the user is a member of one of the whitelisted groups, the user is allowed to be bound to a role.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"labels": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Selectors specifies a list of label selectors over group labels.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/unversioned.LabelSelector"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"groups", "labels"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.LabelSelector"},
 	},
 	"v1.HTTPGetAction": {
 		Schema: spec.Schema{
@@ -17945,6 +17998,91 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"unversioned.ListMeta", "v1.RoleBinding"},
 	},
+	"v1.RoleBindingRestriction": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "RoleBindingRestriction is an object that can be matched against a subject (user, group, or service account) to determine whether rolebindings on that subject are allowed in the namespace to which the RoleBindingRestriction belongs.  If any one of those RoleBindingRestriction objects matches a subject, rolebindings on that subject in the namespace are allowed.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec defines the matcher.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.RoleBindingRestrictionSpec"),
+						},
+					},
+				},
+				Required: []string{"metadata", "spec"},
+			},
+		},
+		Dependencies: []string{
+			"v1.ObjectMeta", "v1.RoleBindingRestrictionSpec"},
+	},
+	"v1.RoleBindingRestrictionList": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "RoleBindingRestrictionList is a collection of RoleBindingRestriction objects.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is a list of RoleBindingRestriction objects.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v1.RoleBindingRestriction"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.ListMeta", "v1.RoleBindingRestriction"},
+	},
+	"v1.RoleBindingRestrictionSpec": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "RoleBindingRestrictionSpec defines a rolebinding restriction.  Exactly one field must be non-nil.",
+				Properties: map[string]spec.Schema{
+					"userrestriction": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UserRestriction matches against user subjects.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.UserRestriction"),
+						},
+					},
+					"grouprestriction": {
+						SchemaProps: spec.SchemaProps{
+							Description: "GroupRestriction matches against group subjects.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.GroupRestriction"),
+						},
+					},
+					"serviceaccountrestriction": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ServiceAccountRestriction matches against service-account subjects.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ServiceAccountRestriction"),
+						},
+					},
+				},
+				Required: []string{"userrestriction", "grouprestriction", "serviceaccountrestriction"},
+			},
+		},
+		Dependencies: []string{
+			"v1.GroupRestriction", "v1.ServiceAccountRestriction", "v1.UserRestriction"},
+	},
 	"v1.RoleList": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18004,7 +18142,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 					"maxUnavailable": {
 						SchemaProps: spec.SchemaProps{
-							Description: "MaxUnavailable is the maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total pods at the start of update (ex: 10%). Absolute number is calculated from percentage by rounding up.\n\nThis cannot be 0 if MaxSurge is 0. By default, 25% is used.\n\nExample: when this is set to 30%, the old RC can be scaled down by 30% immediately when the rolling update starts. Once new pods are ready, old RC can be scaled down further, followed by scaling up the new RC, ensuring that at least 70% of original number of pods are available at all times during the update.",
+							Description: "MaxUnavailable is the maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total pods at the start of update (ex: 10%). Absolute number is calculated from percentage by rounding down.\n\nThis cannot be 0 if MaxSurge is 0. By default, 25% is used.\n\nExample: when this is set to 30%, the old RC can be scaled down by 30% immediately when the rolling update starts. Once new pods are ready, old RC can be scaled down further, followed by scaling up the new RC, ensuring that at least 70% of original number of pods are available at all times during the update.",
 							Ref:         spec.MustCreateRef("#/definitions/intstr.IntOrString"),
 						},
 					},
@@ -19203,6 +19341,70 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			},
 		},
 		Dependencies: []string{},
+	},
+	"v1.ServiceAccountReference": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ServiceAccountReference specifies a service account and namespace by their names.",
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the name of the service account.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"namespace": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Namespace is the namespace of the service account.  Service accounts from inside the whitelisted namespaces are allowed to be bound to roles.  If Namespace is empty, then the namespace of the RoleBindingRestriction in which the ServiceAccountReference is embedded is used.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "namespace"},
+			},
+		},
+		Dependencies: []string{},
+	},
+	"v1.ServiceAccountRestriction": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ServiceAccountRestriction matches a service account by a string match on either the service-account name or the name of the service account's namespace.",
+				Properties: map[string]spec.Schema{
+					"serviceaccounts": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ServiceAccounts specifies a list of literal service-account names.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v1.ServiceAccountReference"),
+									},
+								},
+							},
+						},
+					},
+					"namespaces": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Namespaces specifies a list of literal namespace names.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"serviceaccounts", "namespaces"},
+			},
+		},
+		Dependencies: []string{
+			"v1.ServiceAccountReference"},
 	},
 	"v1.ServiceList": {
 		Schema: spec.Schema{
@@ -20427,6 +20629,59 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{
 			"unversioned.ListMeta", "v1.User"},
+	},
+	"v1.UserRestriction": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UserRestriction matches a user either by a string match on the user name, a string match on the name of a group to which the user belongs, or a label selector applied to the user labels.",
+				Properties: map[string]spec.Schema{
+					"users": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Users specifies a list of literal user names.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"groups": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Groups specifies a list of literal group names.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"labels": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Selectors specifies a list of label selectors over user labels.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/unversioned.LabelSelector"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"users", "groups", "labels"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.LabelSelector"},
 	},
 	"v1.Volume": {
 		Schema: spec.Schema{
