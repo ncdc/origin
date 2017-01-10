@@ -104,7 +104,6 @@ func BuildDefaultAPIServer(options configapi.MasterConfig) (*apiserveroptions.Se
 	server.GenericServerRunOptions.InsecurePort = 0
 	server.GenericServerRunOptions.TLSCertFile = options.ServingInfo.ServerCert.CertFile
 	server.GenericServerRunOptions.TLSPrivateKeyFile = options.ServingInfo.ServerCert.KeyFile
-	server.GenericServerRunOptions.ClientCAFile = options.ServingInfo.ClientCA
 	server.GenericServerRunOptions.MaxRequestsInFlight = options.ServingInfo.MaxRequestsInFlight
 	server.GenericServerRunOptions.MinRequestTimeout = options.ServingInfo.RequestTimeoutSeconds
 	for _, nc := range options.ServingInfo.NamedCertificates {
@@ -288,7 +287,9 @@ func BuildKubernetesMasterConfig(options configapi.MasterConfig, requestContextM
 	genericConfig.LoopbackClientConfig = loopbackClientConfig
 	genericConfig.LegacyAPIGroupPrefixes = LegacyAPIGroupPrefixes
 	genericConfig.SecureServingInfo.BindNetwork = options.ServingInfo.BindNetwork
-	genericConfig.SecureServingInfo.ExtraClientCACerts, err = configapi.GetOAuthClientCertCAs(options)
+	// TODO(sttts): with 1.6 pass configapi.GetClientCertCAs(options) via ServerRunOptions when multiple client CAs are supported there
+	// Meanwhile, as workaround for 1.5:
+	genericConfig.SecureServingInfo.ExtraClientCACerts, err = configapi.GetClientCertCAs(options)
 	if err != nil {
 		glog.Fatalf("Error setting up OAuth2 client certificates: %v", err)
 	}

@@ -404,29 +404,35 @@ func GetNamedCertificateMap(namedCertificates []NamedCertificate) (map[string]*t
 	return namedCerts, nil
 }
 
-// GetClientCertCAPool returns a cert pool containing all client CAs that could be presented (union of API and OAuth)
-func GetClientCertCAPool(options MasterConfig) (*x509.CertPool, error) {
-	roots := x509.NewCertPool()
-
+// GetClientCertCAs returns all client CAs that could be presented (union of API and OAuth)
+func GetClientCertCAs(options MasterConfig) ([]*x509.Certificate, error) {
 	// Add CAs for OAuth
-	certs, err := GetOAuthClientCertCAs(options)
+	oAuthCerts, err := GetOAuthClientCertCAs(options)
 	if err != nil {
 		return nil, err
-	}
-	for _, root := range certs {
-		roots.AddCert(root)
 	}
 
 	// Add CAs for API
-	certs, err = getAPIClientCertCAs(options)
+	apiCerts, err := getAPIClientCertCAs(options)
 	if err != nil {
 		return nil, err
 	}
-	for _, root := range certs {
-		roots.AddCert(root)
+
+	return append(oAuthCerts, apiCerts...), nil
+}
+
+// GetClientCertCAs returns a ppol of all client CAs that could be presented (union of API and OAuth)
+func GetClientCertCAPool(options MasterConfig) (*x509.CertPool, error) {
+	certs, err := GetClientCertCAs(options)
+	if err != nil {
+		return nil, err
 	}
 
-	return roots, nil
+	pool := x509.NewCertPool()
+	for _, c := range certs {
+		pool.AddCert(c)
+	}
+	return pool, nil
 }
 
 func GetOAuthClientCertCAs(options MasterConfig) ([]*x509.Certificate, error) {
