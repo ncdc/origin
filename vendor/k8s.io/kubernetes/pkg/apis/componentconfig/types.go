@@ -175,6 +175,8 @@ type KubeletConfiguration struct {
 	PodInfraContainerImage string
 	// dockerEndpoint is the path to the docker endpoint to communicate with.
 	DockerEndpoint string
+	// dockerShimSocket is the path to the dockershim socket.
+	DockerShimSocket string
 	// rootDirectory is the directory path to place kubelet files (volume
 	// mounts,etc).
 	RootDirectory string

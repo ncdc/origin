@@ -274,6 +274,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.HostnameOverride = in.HostnameOverride
 	out.PodInfraContainerImage = in.PodInfraContainerImage
 	out.DockerEndpoint = in.DockerEndpoint
+	out.DockerShimSocket = in.DockerShimSocket
 	out.RootDirectory = in.RootDirectory
 	out.SeccompProfileRoot = in.SeccompProfileRoot
 	if err := v1.Convert_Pointer_bool_To_bool(&in.AllowPrivileged, &out.AllowPrivileged, s); err != nil {
@@ -453,6 +454,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.HostnameOverride = in.HostnameOverride
 	out.PodInfraContainerImage = in.PodInfraContainerImage
 	out.DockerEndpoint = in.DockerEndpoint
+	out.DockerShimSocket = in.DockerShimSocket
 	out.RootDirectory = in.RootDirectory
 	out.SeccompProfileRoot = in.SeccompProfileRoot
 	if err := v1.Convert_bool_To_Pointer_bool(&in.AllowPrivileged, &out.AllowPrivileged, s); err != nil {

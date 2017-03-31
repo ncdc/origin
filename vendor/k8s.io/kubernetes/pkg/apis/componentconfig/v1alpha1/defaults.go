@@ -226,6 +226,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.DockerEndpoint == "" && runtime.GOOS != "windows" {
 		obj.DockerEndpoint = "unix:///var/run/docker.sock"
 	}
+	if obj.DockerShimSocket == "" {
+		obj.DockerShimSocket = "/var/run/dockershim.sock"
+	}
 	if obj.EventBurst == 0 {
 		obj.EventBurst = 10
 	}

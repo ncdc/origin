@@ -171,6 +171,7 @@ dns-provider
 dns-provider-config
 dns-zone-name
 dockercfg-path
+dockershim-socket
 docker-email
 docker-endpoint
 docker-exec-handler
