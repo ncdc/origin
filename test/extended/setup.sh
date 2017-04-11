@@ -341,7 +341,9 @@ readonly EXCLUDED_TESTS=(
 	"should check if Kubernetes master services is included in cluster-info"
 
 	# this tests dns federation configuration via configmap, which we don't support yet
-	"DNS config map"
+	"DNS configMap"
+
+	"\[Feature:Downgrade\]"
 )
 
 readonly SERIAL_TESTS=(
