@@ -3681,6 +3681,7 @@ items:
     - create
     - delete
     - list
+    - patch
     - watch
   - apiGroups:
     - ""
@@ -3738,6 +3739,7 @@ items:
     verbs:
     - create
     - delete
+    - patch
   - apiGroups:
     - ""
     attributeRestrictions: null
